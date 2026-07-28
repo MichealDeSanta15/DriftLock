@@ -1,23 +1,92 @@
-/**
- * Supabase client for database operations.
- */
-
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error(
-    "Missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
-  );
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-/**
- * Type definitions for database tables.
- */
+// Auth types and functions
+export interface AuthUser {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, unknown>;
+}
+
+export async function signUp(email: string, password: string): Promise<AuthUser> {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+  if (!data.user) throw new Error('Sign up failed: no user returned');
+
+  return {
+    id: data.user.id,
+    email: data.user.email,
+    user_metadata: data.user.user_metadata,
+  };
+}
+
+export async function signIn(email: string, password: string): Promise<AuthUser> {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) throw error;
+  if (!data.user) throw new Error('Sign in failed: no user returned');
+
+  return {
+    id: data.user.id,
+    email: data.user.email,
+    user_metadata: data.user.user_metadata,
+  };
+}
+
+export async function signOut(): Promise<void> {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    user_metadata: user.user_metadata,
+  };
+}
+
+export function onAuthStateChange(
+  callback: (user: AuthUser | null) => void
+): () => void {
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    if (!session?.user) {
+      callback(null);
+      return;
+    }
+
+    callback({
+      id: session.user.id,
+      email: session.user.email,
+      user_metadata: session.user.user_metadata,
+    });
+  });
+
+  return () => data?.subscription?.unsubscribe();
+}
+
+// Database types
 export interface Selector {
   id: string;
   site_id: string;
@@ -63,14 +132,12 @@ export interface Snapshot {
   created_at: string;
 }
 
-/**
- * Database helper functions.
- */
+// Database helpers
 export async function getSelector(selectorId: string): Promise<Selector | null> {
   const { data, error } = await supabase
-    .from("selectors")
-    .select("*")
-    .eq("id", selectorId)
+    .from('selectors')
+    .select('*')
+    .eq('id', selectorId)
     .single();
 
   if (error) {
@@ -83,12 +150,12 @@ export async function getSelector(selectorId: string): Promise<Selector | null> 
 
 export async function getSelectors(selectorIds: string[]): Promise<Selector[]> {
   const { data, error } = await supabase
-    .from("selectors")
-    .select("*")
-    .in("id", selectorIds);
+    .from('selectors')
+    .select('*')
+    .in('id', selectorIds);
 
   if (error) {
-    console.error("Error fetching selectors:", error);
+    console.error('Error fetching selectors:', error);
     return [];
   }
 
@@ -97,14 +164,14 @@ export async function getSelectors(selectorIds: string[]): Promise<Selector[]> {
 
 export async function getLatestSnapshot(siteUrl: string): Promise<Snapshot | null> {
   const { data, error } = await supabase
-    .from("snapshots")
-    .select("*")
-    .eq("site_url", siteUrl)
-    .order("created_at", { ascending: false })
+    .from('snapshots')
+    .select('*')
+    .eq('site_url', siteUrl)
+    .order('created_at', { ascending: false })
     .limit(1)
     .single();
 
-  if (error && error.code !== "PGRST116") {
+  if (error && error.code !== 'PGRST116') {
     console.error(`Error fetching snapshot for ${siteUrl}:`, error);
     return null;
   }
@@ -117,10 +184,10 @@ export async function getRecentVersions(
   limit: number = 3
 ): Promise<SelectorVersion[]> {
   const { data, error } = await supabase
-    .from("selector_versions")
-    .select("*")
-    .eq("selector_id", selectorId)
-    .order("created_at", { ascending: false })
+    .from('selector_versions')
+    .select('*')
+    .eq('selector_id', selectorId)
+    .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) {
@@ -136,12 +203,12 @@ export async function updateSelector(
   updates: Partial<Selector>
 ): Promise<boolean> {
   const { error } = await supabase
-    .from("selectors")
+    .from('selectors')
     .update({
       ...updates,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", selectorId);
+    .eq('id', selectorId);
 
   if (error) {
     console.error(`Error updating selector ${selectorId}:`, error);
@@ -152,46 +219,47 @@ export async function updateSelector(
 }
 
 export async function createSelectorVersion(
-  version: Omit<SelectorVersion, "id" | "created_at">
+  version: Omit<SelectorVersion, 'id' | 'created_at'>
 ): Promise<SelectorVersion | null> {
   const { data, error } = await supabase
-    .from("selector_versions")
+    .from('selector_versions')
     .insert([version])
     .select()
     .single();
 
   if (error) {
-    console.error("Error creating selector version:", error);
+    console.error('Error creating selector version:', error);
     return null;
   }
 
   return data;
 }
 
-export async function createChangeLog(log: Omit<ChangeLog, "id">): Promise<ChangeLog | null> {
+export async function createChangeLog(log: Omit<ChangeLog, 'id'>): Promise<ChangeLog | null> {
   const { data, error } = await supabase
-    .from("change_logs")
+    .from('change_logs')
     .insert([log])
     .select()
     .single();
 
   if (error) {
-    console.error("Error creating change log:", error);
+    console.error('Error creating change log:', error);
     return null;
   }
 
   return data;
 }
 
-export async function saveSnapshot(siteUrl: string, snapshotData: any): Promise<boolean> {
-  const { error } = await supabase
-    .from("snapshots")
-    .insert([
-      {
-        site_url: siteUrl,
-        data: snapshotData,
-      },
-    ]);
+export async function saveSnapshot(
+  siteUrl: string,
+  snapshotData: Record<string, unknown>
+): Promise<boolean> {
+  const { error } = await supabase.from('snapshots').insert([
+    {
+      site_url: siteUrl,
+      data: snapshotData,
+    },
+  ]);
 
   if (error) {
     console.error(`Error saving snapshot for ${siteUrl}:`, error);
