@@ -1,0 +1,223 @@
+# Data Layer Setup Guide — Story 1, Phase 1
+
+**Status**: ✅ Complete and ready for Person 3 (migrations)
+
+## What's Been Built
+
+### 1. ORM Models (`backend/models/selector.py`)
+
+Three core tables with relationships:
+
+- **Selector**: Main entity (id, site_id, selector_key, is_current, repair_count, timestamps)
+- **SelectorVersion**: Version history per selector (selector_value, version_number, confidence_score, is_backup)
+- **ChangeLog**: Audit trail of detections/repairs (old_selector, new_selector, detection_method, repair_method, repair_status, etc.)
+
+**Key Features**:
+- Full type hints + PEP 8 compliant
+- Relationships with cascade delete
+- Proper indexes on `(site_id, is_current)` and `(selector_id, created_at)`
+- Timezone-aware timestamps (UTC)
+- Testable (SQLAlchemy with pytest fixtures)
+
+### 2. Database Configuration
+
+- `backend/db.py`: Session management, `get_db()` dependency, `init_db()` helper
+- `.env.example`: Template for DATABASE_URL and config
+- `requirements.txt`: All dependencies (SQLAlchemy, Alembic, pytest, etc.)
+
+### 3. Test Suite (`backend/tests/`)
+
+- `conftest.py`: Pytest fixtures for in-memory SQLite testing
+- `test_selector_models.py`: 10+ tests covering:
+  - Model creation and data integrity
+  - Relationships and cascading deletes
+  - Index filtering (`site_id, is_current`)
+  - Optional fields and defaults
+  - Status enums (pending, success, failed, partial)
+
+### 4. Documentation
+
+- `SCHEMA.md`: Exact SQL schema (table definitions, indexes, relationships)
+- `backend/migrations/README.md`: How to generate and apply Alembic migrations
+- `ARCHITECTURE.md`: Design rationale and data flow
+- `SETUP_DATA_LAYER.md`: This file
+
+---
+
+## Next Steps: Person 3 (Migrations)
+
+### 1. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Create `.env` File
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your PostgreSQL credentials:
+```
+DATABASE_URL=postgresql://user:password@localhost:5432/driftlock
+```
+
+### 3. Initialize Alembic (First Time Only)
+
+```bash
+cd backend
+alembic init alembic
+```
+
+This creates `alembic/` directory and `alembic.ini`.
+
+### 4. Update `alembic/env.py`
+
+Make it read from environment and models:
+
+```python
+import os
+from dotenv import load_dotenv
+from backend.models import Base
+
+load_dotenv()
+database_url = os.getenv("DATABASE_URL")
+
+# In the run_migrations_online() function:
+configuration.set_main_option("sqlalchemy.url", database_url)
+target_metadata = Base.metadata
+```
+
+### 5. Generate Migration from Models
+
+```bash
+alembic revision --autogenerate -m "Initial schema: selectors, versions, change_logs"
+```
+
+This creates a migration file like `alembic/versions/001_initial_schema.py`.
+
+### 6. Review Generated Migration
+
+```bash
+cat alembic/versions/001_initial_schema.py
+```
+
+Should include:
+- CREATE TABLE selectors, selector_versions, change_logs
+- Foreign key constraints with CASCADE DELETE
+- CREATE INDEX statements for performance
+
+### 7. Apply Migration
+
+```bash
+alembic upgrade head
+```
+
+### 8. Verify Schema
+
+```bash
+# List tables
+psql driftlock -c "\dt"
+
+# List indexes
+psql driftlock -c "\di" | grep idx_
+```
+
+---
+
+## Running Tests (Optional)
+
+Once migrations are applied:
+
+```bash
+pytest backend/tests/test_selector_models.py -v
+```
+
+Expected output: All tests pass ✓
+
+---
+
+## Key Design Notes for Person 1
+
+1. **Soft Deletes**: Selectors aren't deleted; they're marked `is_current=False`. This preserves history for pattern learning.
+
+2. **Version Numbers**: Sequential per selector (1, 2, 3, ...), not global. Makes rebuilds easier.
+
+3. **Confidence Scores**: Repair algorithm outputs confidence (0-100) for each candidate selector. Store in SelectorVersion + ChangeLog for ranking fallbacks.
+
+4. **Backup Selectors**: Multiple CSS paths per selector, tried in priority order. Flag with `is_backup=True`.
+
+5. **Repair Status**: Enum in ChangeLog: pending, success, failed, partial. Enables querying failed repairs for retry.
+
+6. **Indexes**: 
+   - `(site_id, is_current)`: For fast "get current selector for site X"
+   - `(selector_id, version_number)`: For version lookup
+   - `(selector_id, detection_timestamp)`: For audit trails
+   - `(repair_status)`: For finding pending/failed repairs
+
+---
+
+## File Structure After Completion
+
+```
+backend/
+├── __init__.py
+├── db.py                          # Session + config
+├── models/
+│   ├── __init__.py
+│   └── selector.py                # ORM models (Selector, SelectorVersion, ChangeLog)
+├── detection/
+│   └── __init__.py                # (Stub, for Phase 2)
+├── repair/
+│   └── __init__.py                # (Stub, for Phase 2)
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py                # Pytest fixtures
+│   └── test_selector_models.py     # Model tests
+├── migrations/
+│   ├── README.md                  # Migration guide
+│   └── alembic/                   # Generated by Person 3
+│       ├── env.py
+│       ├── script.py.mako
+│       └── versions/
+│           └── 001_initial_schema.py
+└── SCHEMA.md                       # SQL schema docs
+```
+
+---
+
+## Progress Checklist
+
+- [x] ORM models with proper relationships
+- [x] Type hints + PEP 8 compliance
+- [x] Database session management
+- [x] Test suite with fixtures
+- [x] Schema documentation for SQL
+- [x] Migration instructions for Person 3
+- [x] Architecture documentation
+- [ ] **Person 3: Generate Alembic migrations**
+- [ ] **Person 3: Apply to PostgreSQL**
+- [ ] **Person 1: Implement detection/repair logic (Phase 2)**
+- [ ] **Person 2: Build API endpoints (Phase 3)**
+- [ ] Full integration testing
+
+---
+
+## Troubleshooting
+
+### "No such module: backend.models"
+- Ensure you're running from project root: `cd /path/to/DriftLock`
+- Check Python path includes the project root
+
+### "DATABASE_URL not set"
+- Create `.env` from `.env.example`
+- Load it: `set -a; source .env; set +a` (Linux/Mac) or `$env:DATABASE_URL = "..."` (PowerShell)
+
+### "ModuleNotFoundError: No module named 'sqlalchemy'"
+- Install dependencies: `pip install -r requirements.txt`
+
+### Migration fails
+- Check PostgreSQL is running: `psql -U postgres -l`
+- Verify DATABASE_URL syntax: `postgresql://user:password@host:port/dbname`
+- Check migration file for syntax errors
