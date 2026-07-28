@@ -65,6 +65,70 @@ class Selector(Base):
         Index("idx_selector_key", selector_key),
     )
 
+    def update_selector_state(
+        self,
+        new_selector: str,
+        repair_method: str,
+        confidence: int,
+        session: Optional[object] = None,
+    ) -> None:
+        """Update selector state after successful repair.
+
+        Updates the active selector key, increments repair count, and records
+        the repair method and confidence. The updated_at timestamp is automatically
+        updated by SQLAlchemy.
+
+        Args:
+            new_selector: The new CSS selector that works on the redesigned site.
+            repair_method: How the selector was repaired (e.g., "backup_selector", "json_ld", "reverse_search").
+            confidence: Confidence score 0-100 in the new selector.
+            session: Optional SQLAlchemy session for explicit commit. If not provided, changes are staged.
+
+        Example:
+            selector.update_selector_state(
+                new_selector="h2.product-name",
+                repair_method="backup_selector",
+                confidence=95
+            )
+            session.commit()
+        """
+        self.selector_key = new_selector
+        self.repair_count += 1
+
+        if session:
+            session.add(self)
+
+    def get_state(self) -> dict:
+        """Get current selector state.
+
+        Returns:
+            Dictionary with current selector state and repair history.
+        """
+        last_repair = None
+        if self.change_logs:
+            successful_repairs = [
+                log
+                for log in self.change_logs
+                if log.repair_status == "success" and log.repair_timestamp
+            ]
+            if successful_repairs:
+                last_repair = max(successful_repairs, key=lambda x: x.repair_timestamp)
+
+        return {
+            "id": self.id,
+            "site_id": self.site_id,
+            "current_selector": self.selector_key,
+            "is_current": self.is_current,
+            "repair_count": self.repair_count,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "last_repair": {
+                "timestamp": last_repair.repair_timestamp.isoformat() if last_repair else None,
+                "method": last_repair.repair_method if last_repair else None,
+                "confidence": last_repair.validation_score / 100 if last_repair and last_repair.validation_score else None,
+            } if last_repair else None,
+        }
+
     def __repr__(self) -> str:
         return f"<Selector(id={self.id}, site={self.site_id}, key={self.selector_key}, current={self.is_current})>"
 
