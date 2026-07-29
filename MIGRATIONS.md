@@ -1,10 +1,12 @@
-# Alembic Migrations Guide
+# DriftLock Database Migrations with Alembic
+
+Complete guide to Alembic database migrations for DriftLock.
 
 ## Overview
 
 DriftLock uses Alembic for database schema versioning and migration management. This enables:
 - **Reproducible deployments** across dev, staging, and production
-- **Rollback capability** if a migration causes issues
+- **Rollback capability** if a migration causes issues  
 - **Migration history** for audit and debugging
 - **Team collaboration** with safe schema changes
 
