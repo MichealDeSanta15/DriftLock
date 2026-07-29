@@ -28,7 +28,6 @@ jobs:
   test:
     name: Test Backend (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    working-directory: ./
 
     strategy:
       matrix:
