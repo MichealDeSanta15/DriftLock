@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SiteList } from '@/components/dashboard/SiteList';
 import { AlertBanner } from '@/components/dashboard/AlertBanner';
 import { triggerDetection, getSites, type Site } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 type AlertStatus = 'detecting' | 'repairing' | 'success' | 'failed' | null;
 
@@ -20,6 +21,7 @@ export default function DashboardPage(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [detectionInProgress, setDetectionInProgress] = useState<string | null>(null);
   const [alert, setAlert] = useState<Alert | null>(null);
+  const subscriptionRef = useRef<{ unsubscribe: () => Promise<void> } | null>(null);
 
   const log = (message: string, data?: unknown) => {
     const timestamp = new Date().toISOString();
@@ -70,6 +72,87 @@ export default function DashboardPage(): React.ReactElement {
 
     fetchSites();
   }, []);
+
+  // Set up real-time subscriptions for change logs
+  useEffect(() => {
+    log('Setting up real-time subscriptions');
+
+    const setupSubscriptions = async () => {
+      const changeLogsSubscription = supabase
+        .channel('change_logs_channel')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'change_logs' },
+          (payload) => {
+            log('Change log update received', { payload });
+
+            const changeLog = payload.new as {
+              selector_id: string;
+              repair_status: string;
+              repair_timestamp: string;
+            };
+
+            if (changeLog.repair_status === 'completed' || changeLog.repair_status === 'success') {
+              setSites((prevSites) =>
+                prevSites.map((site) => {
+                  if (site.selectorId === changeLog.selector_id) {
+                    return {
+                      ...site,
+                      status: 'working' as const,
+                      lastRepaired: changeLog.repair_timestamp,
+                    };
+                  }
+                  return site;
+                })
+              );
+
+              setAlert({
+                siteName: sites.find((s) => s.selectorId === changeLog.selector_id)?.name || 'Unknown',
+                selectorId: changeLog.selector_id,
+                status: 'success',
+                message: 'Selector repaired successfully!',
+              });
+
+              log('Site status updated to working', { selectorId: changeLog.selector_id });
+            } else if (changeLog.repair_status === 'failed') {
+              setSites((prevSites) =>
+                prevSites.map((site) => {
+                  if (site.selectorId === changeLog.selector_id) {
+                    return {
+                      ...site,
+                      status: 'failed' as const,
+                    };
+                  }
+                  return site;
+                })
+              );
+
+              setAlert({
+                siteName: sites.find((s) => s.selectorId === changeLog.selector_id)?.name || 'Unknown',
+                selectorId: changeLog.selector_id,
+                status: 'failed',
+                message: 'Repair failed. Manual review needed.',
+              });
+
+              log('Site status updated to failed', { selectorId: changeLog.selector_id });
+            }
+          }
+        )
+        .subscribe();
+
+      subscriptionRef.current = { unsubscribe: () => changeLogsSubscription.unsubscribe() };
+    };
+
+    setupSubscriptions();
+
+    return () => {
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe().catch((error) => {
+          log('Error unsubscribing from real-time updates', { error });
+        });
+      }
+    };
+  }, [sites]);
 
   const handleTriggerDetection = useCallback(async (siteId: string) => {
     const site = sites.find((s) => s.id === siteId);
@@ -185,14 +268,14 @@ export default function DashboardPage(): React.ReactElement {
     <DashboardLayout>
       <div className="space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-col sm:flex-row gap-4">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">Dashboard</h2>
-            <p className="text-gray-600 mt-2">Monitor your web scraper selectors in real-time</p>
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h2>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">Monitor your web scraper selectors in real-time</p>
           </div>
           <button
             onClick={handleAddSite}
-            className="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition"
+            className="px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition"
           >
             + Add Site
           </button>
@@ -219,7 +302,7 @@ export default function DashboardPage(): React.ReactElement {
 
         {/* Sites Table */}
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Monitored Sites</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Monitored Sites</h3>
           <SiteList
             sites={sites}
             loading={loading}
@@ -229,13 +312,13 @@ export default function DashboardPage(): React.ReactElement {
         </div>
 
         {/* Info Box */}
-        <div className="bg-green-50 rounded-lg border border-green-200 p-6">
-          <h4 className="font-semibold text-green-900 mb-2">✅ Dashboard Connected</h4>
-          <p className="text-sm text-green-800">
+        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700 p-6">
+          <h4 className="font-semibold text-green-900 dark:text-green-200 mb-2">✅ Dashboard Connected</h4>
+          <p className="text-sm text-green-800 dark:text-green-300">
             The dashboard is now connected to the API endpoints and database. All sites and selectors
             are fetched in real-time from the database.
           </p>
-          <ul className="text-sm text-green-800 mt-2 list-disc list-inside">
+          <ul className="text-sm text-green-800 dark:text-green-300 mt-2 list-disc list-inside">
             <li>✅ GET /api/sites - Fetch all monitored sites</li>
             <li>✅ POST /api/sites/detect - Trigger detection</li>
             <li>✅ GET /api/selectors/[id]/current - Get current selector</li>
@@ -264,10 +347,10 @@ interface StatCardProps {
 
 function StatCard({ title, value, description }: StatCardProps): React.ReactElement {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 shadow-sm">
-      <p className="text-sm font-medium text-gray-600">{title}</p>
-      <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
-      <p className="text-sm text-gray-500 mt-2">{description}</p>
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
+      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{title}</p>
+      <p className="text-3xl font-bold text-gray-900 dark:text-white mt-2">{value}</p>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{description}</p>
     </div>
   );
 }

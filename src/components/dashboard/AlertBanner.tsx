@@ -35,30 +35,30 @@ export function AlertBanner({
 
   const statusConfig = {
     detecting: {
-      bgColor: 'bg-blue-50',
-      borderColor: 'border-blue-200',
-      textColor: 'text-blue-900',
+      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+      borderColor: 'border-blue-200 dark:border-blue-700',
+      textColor: 'text-blue-900 dark:text-blue-200',
       icon: '🔍',
       title: 'Detecting changes...',
     },
     repairing: {
-      bgColor: 'bg-amber-50',
-      borderColor: 'border-amber-200',
-      textColor: 'text-amber-900',
+      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
+      borderColor: 'border-amber-200 dark:border-amber-700',
+      textColor: 'text-amber-900 dark:text-amber-200',
       icon: '⚙️',
       title: 'Repairing selectors...',
     },
     success: {
-      bgColor: 'bg-green-50',
-      borderColor: 'border-green-200',
-      textColor: 'text-green-900',
+      bgColor: 'bg-green-50 dark:bg-green-900/20',
+      borderColor: 'border-green-200 dark:border-green-700',
+      textColor: 'text-green-900 dark:text-green-200',
       icon: '✅',
       title: 'Repair successful!',
     },
     failed: {
-      bgColor: 'bg-red-50',
-      borderColor: 'border-red-200',
-      textColor: 'text-red-900',
+      bgColor: 'bg-red-50 dark:bg-red-900/20',
+      borderColor: 'border-red-200 dark:border-red-700',
+      textColor: 'text-red-900 dark:text-red-200',
       icon: '❌',
       title: 'Repair failed',
     },
@@ -82,7 +82,7 @@ export function AlertBanner({
                   {selectorId && (
                     <>
                       <br />
-                      Selector: <code className="text-xs bg-black bg-opacity-10 px-1 rounded">
+                      Selector: <code className="text-xs bg-black/10 dark:bg-black/30 px-1 rounded">
                         {selectorId}
                       </code>
                     </>
@@ -97,7 +97,7 @@ export function AlertBanner({
             setVisible(false);
             onDismiss?.();
           }}
-          className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-lg"
+          className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400 flex-shrink-0 text-lg"
           aria-label="Dismiss alert"
         >
           ✕
