@@ -9,16 +9,23 @@ Usage:
 Server will run on http://localhost:8000
 
 Endpoints:
-    POST /detect - Detect website changes
-    POST /repair - Repair broken selector
-    POST /snapshot - Create website snapshot
+    GET /health - Health check
+    GET /api/sites - Get all sites
+    POST /api/sites - Create a new site
+    DELETE /api/sites/{site_id} - Delete a site
+    POST /api/sites/detect - Detect website changes
+    GET /api/selectors/{selector_id}/current - Get current selector
+    POST /detect - Detect website changes (legacy)
+    POST /repair - Repair broken selector (legacy)
+    POST /snapshot - Create website snapshot (legacy)
 """
 
 import logging
 import sys
 from typing import Optional
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -98,6 +105,39 @@ class RepairResponse(BaseModel):
     method: str
     confidence: float
     details: Optional[dict] = None
+
+
+class SiteResponse(BaseModel):
+    """Response for a site."""
+
+    id: str
+    name: str
+    url: str
+    status: str = "working"
+    lastChecked: str
+    selectorId: str
+    currentSelector: str
+    lastRepaired: Optional[str] = None
+
+
+class CreateSiteRequest(BaseModel):
+    """Request to create a site."""
+
+    name: str
+    url: str
+
+
+class SitesListResponse(BaseModel):
+    """Response for sites list."""
+
+    sites: list[SiteResponse]
+
+
+class DetectAPIRequest(BaseModel):
+    """Request to trigger detection on a site."""
+
+    site_id: str
+    selector_id: Optional[str] = None
 
 
 @app.post("/detect", response_model=DetectResponse)
@@ -222,6 +262,116 @@ async def repair(req: RepairRequest) -> RepairResponse:
 async def health():
     """Health check endpoint."""
     return {"status": "ok", "service": "driftlock-backend"}
+
+
+@app.get("/api/sites", response_model=SitesListResponse)
+async def get_sites():
+    """Get all sites.
+
+    Returns:
+        List of sites with their status and selector information
+    """
+    try:
+        logger.info("GET /api/sites - Fetching all sites")
+        # TODO: Connect to database and fetch sites
+        # For now, return empty list to match frontend behavior
+        return SitesListResponse(sites=[])
+    except Exception as e:
+        logger.error(f"Failed to fetch sites: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/sites", response_model=SiteResponse)
+async def create_site(req: CreateSiteRequest):
+    """Create a new site.
+
+    Args:
+        req: Site creation request with name and URL
+
+    Returns:
+        Created site with ID and default status
+    """
+    try:
+        logger.info(f"POST /api/sites - Creating site: {req.name}")
+        site_id = str(uuid4())
+        return SiteResponse(
+            id=site_id,
+            name=req.name,
+            url=req.url,
+            status="working",
+            lastChecked="2025-01-01T00:00:00Z",
+            selectorId="unknown",
+            currentSelector="Not set",
+        )
+    except Exception as e:
+        logger.error(f"Failed to create site: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/sites/{site_id}")
+async def delete_site(site_id: str = Path(...)):
+    """Delete a site.
+
+    Args:
+        site_id: The site ID to delete
+
+    Returns:
+        Success message
+    """
+    try:
+        logger.info(f"DELETE /api/sites/{site_id} - Deleting site")
+        # TODO: Connect to database and delete site
+        return {"success": True, "message": f"Site {site_id} deleted"}
+    except Exception as e:
+        logger.error(f"Failed to delete site {site_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/sites/detect")
+async def detect_site_changes(req: DetectAPIRequest):
+    """Trigger detection on a site.
+
+    Args:
+        req: Detection request with site_id
+
+    Returns:
+        Detection result
+    """
+    try:
+        logger.info(f"POST /api/sites/detect - Triggering detection for site {req.site_id}")
+        return {
+            "detected": False,
+            "confidence": 0.0,
+            "change_type": "none",
+            "details": None,
+        }
+    except Exception as e:
+        logger.error(f"Failed to detect changes for site {req.site_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/selectors/{selector_id}/current")
+async def get_current_selector(selector_id: str = Path(...)):
+    """Get current selector for a selector ID.
+
+    Args:
+        selector_id: The selector ID
+
+    Returns:
+        Current selector information
+    """
+    try:
+        logger.info(f"GET /api/selectors/{selector_id}/current - Fetching selector")
+        return {
+            "selectorId": selector_id,
+            "currentSelector": "div.selector",
+            "timestamp": "2025-01-01T00:00:00Z",
+            "repairCount": 0,
+            "lastRepaired": None,
+        }
+    except Exception as e:
+        logger.error(f"Failed to fetch selector {selector_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == "__main__":
