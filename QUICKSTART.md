@@ -1,8 +1,39 @@
-# DriftLock Database — Quick Start Guide
+# DriftLock Quick Start Guide
 
-Get the database running in 5 minutes.
+Get the entire development environment running in 30 seconds with Docker, or 5 minutes manually.
 
-## Prerequisites
+## ⚡ Fastest Option: Docker (Recommended)
+
+For the quickest setup, use Docker Compose:
+
+### Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+
+### Setup (One Command)
+
+```bash
+./backend/docker_up.sh
+```
+
+✅ Everything starts automatically:
+- PostgreSQL database
+- Python backend
+- Database migrations
+- Live reload
+
+**Backend is ready at:** http://localhost:8000
+
+See `DOCKER_SETUP.md` for detailed Docker guide.
+
+---
+
+## Manual Setup (Local PostgreSQL)
+
+If you prefer not to use Docker, set up locally.
+
+### Prerequisites
 
 - PostgreSQL 12+ installed and running
 - Python 3.10+
