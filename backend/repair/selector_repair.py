@@ -107,6 +107,8 @@ def _extract_selector_from_ld(soup: BeautifulSoup, ld_data: dict) -> Optional[st
         text_to_find = ld_data["name"]
     elif "headline" in ld_data:
         text_to_find = ld_data["headline"]
+    elif "title" in ld_data:
+        text_to_find = ld_data["title"]
     elif "price" in ld_data:
         text_to_find = str(ld_data["price"])
 
@@ -159,9 +161,11 @@ def reverse_search(old_html: str, new_html: str, old_selector: str, target_text:
     if not target_text:
         return None
 
+    irrelevant_tags = {"script", "style", "meta", "link", "noscript"}
+
     for element in new_soup.find_all(string=lambda x: target_text in str(x) if x else False):
         parent = element.parent
-        if parent and isinstance(parent, Tag):
+        if parent and isinstance(parent, Tag) and parent.name not in irrelevant_tags:
             selector = _build_css_selector(parent)
             if selector:
                 return selector, 0.8
@@ -172,7 +176,7 @@ def reverse_search(old_html: str, new_html: str, old_selector: str, target_text:
 def _build_css_selector(element: Tag) -> Optional[str]:
     """Build a CSS selector for a given element.
 
-    Prefers ID, then classes, then tag name.
+    Prefers classes, then ID, then tag name.
 
     Args:
         element: BeautifulSoup Tag object.
@@ -183,11 +187,11 @@ def _build_css_selector(element: Tag) -> Optional[str]:
     if element.name is None:
         return None
 
-    if element.get("id"):
-        return f"{element.name}#{element['id']}"
-    elif element.get("class"):
+    if element.get("class"):
         classes = " ".join(element["class"])
         return f"{element.name}.{classes.replace(' ', '.')}"
+    elif element.get("id"):
+        return f"{element.name}#{element['id']}"
     else:
         return element.name
 

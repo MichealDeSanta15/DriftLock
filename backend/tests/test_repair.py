@@ -184,7 +184,7 @@ class TestBackupSelectors:
         """Test graceful handling of invalid CSS selectors."""
         backups = [
             "!!!invalid",
-            "div.valid h2",
+            "section.product-showcase h2",
         ]
 
         result = try_backup_selectors(RETAIL_NEW_HTML, backups)
