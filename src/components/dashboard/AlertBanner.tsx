@@ -22,13 +22,16 @@ export function AlertBanner({
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    if (autoClose && (status === 'success' || status === 'failed')) {
-      const timer = setTimeout(() => {
-        setVisible(false);
-        onDismiss?.();
-      }, 5000);
-      return () => clearTimeout(timer);
+    if (!autoClose || (status !== 'success' && status !== 'failed')) {
+      return;
     }
+
+    const timer = setTimeout(() => {
+      setVisible(false);
+      onDismiss?.();
+    }, 5000);
+
+    return () => clearTimeout(timer);
   }, [status, onDismiss, autoClose]);
 
   if (!visible) return null;

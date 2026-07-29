@@ -1,18 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { SelectorStatus, type SelectorHealthStatus } from './SelectorStatus';
+import React from 'react';
+import { SelectorStatus } from './SelectorStatus';
+import { type Site } from '@/lib/api';
 
-interface Site {
-  id: string;
-  name: string;
-  url: string;
-  status: SelectorHealthStatus;
-  lastChecked: string;
-  selectorId: string;
-  currentSelector: string;
-  lastRepaired?: string;
-}
+export type { Site };
 
 interface SiteListProps {
   sites: Site[];

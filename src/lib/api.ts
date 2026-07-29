@@ -1,4 +1,17 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
+export type SelectorHealthStatus = 'working' | 'broken' | 'failed';
+
+export interface Site {
+  id: string;
+  name: string;
+  url: string;
+  status: SelectorHealthStatus;
+  lastChecked: string;
+  selectorId: string;
+  currentSelector: string;
+  lastRepaired?: string;
+}
 
 export interface DetectionResult {
   site_id: string;
@@ -6,6 +19,7 @@ export interface DetectionResult {
   signal_type: string;
   confidence: number;
   metadata: Record<string, unknown>;
+  detected?: boolean;
 }
 
 export interface SelectorUpdate {
@@ -45,6 +59,11 @@ async function fetchAPI<T>(
   }
 
   return response.json() as Promise<T>;
+}
+
+export async function getSites(): Promise<Site[]> {
+  const response = await fetchAPI<{ sites: Site[] }>('/api/sites');
+  return response.sites;
 }
 
 export async function triggerDetection(siteId: string): Promise<DetectionResult> {

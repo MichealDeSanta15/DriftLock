@@ -21,7 +21,7 @@ export default function DashboardPage(): React.ReactElement {
   const [loading, setLoading] = useState(true);
   const [detectionInProgress, setDetectionInProgress] = useState<string | null>(null);
   const [alert, setAlert] = useState<Alert | null>(null);
-  const subscriptionRef = useRef<{ unsubscribe: () => Promise<void> } | null>(null);
+  const subscriptionRef = useRef<{ unsubscribe: () => Promise<any> } | null>(null);
 
   const log = (message: string, data?: unknown) => {
     const timestamp = new Date().toISOString();
