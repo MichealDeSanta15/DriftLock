@@ -1,19 +1,43 @@
 'use client';
 
-import React, { ReactNode, useState } from 'react';
+import React, { ReactNode, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { LayoutDashboard, Globe, Settings, LogOut, Menu, X, Key } from 'lucide-react';
+import { LayoutDashboard, Settings, LogOut, Menu, X, Key } from 'lucide-react';
 import { useReducedMotion } from '@/lib/motion';
+import { signOut } from '@/lib/auth';
+import { useAuth } from '@/lib/AuthContext';
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps): React.ReactElement {
+export function DashboardLayout({ children }: DashboardLayoutProps): React.ReactElement | null {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const reducedMotion = useReducedMotion();
+  const router = useRouter();
+  const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [loading, user, router]);
+
+  const handleSignOut = async () => {
+    await signOut();
+    router.push('/login');
+  };
+
+  if (loading || !user) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <div className="w-8 h-8 border-2 border-slate-700 border-t-indigo-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-950">
@@ -33,14 +57,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps): React.React
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-1">
             <NavLink href="/dashboard" label="Dashboard" icon={LayoutDashboard} />
-            <NavLink href="/sites" label="Sites" icon={Globe} />
             <NavLink href="/settings" label="Settings" icon={Settings} />
-            <NavLink href="/api" label="API Keys" icon={Key} />
+            <NavLink href="/settings" label="API Keys" icon={Key} />
           </nav>
 
           {/* Sign Out */}
           <div className="p-4 border-t border-slate-800">
-            <button className="w-full flex items-center gap-2 px-4 py-2.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors duration-300">
+            <button
+              onClick={handleSignOut}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors duration-300"
+            >
               <LogOut size={18} />
               <span className="text-sm font-medium">Sign Out</span>
             </button>
@@ -92,9 +118,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps): React.React
             <h2 className="text-lg font-semibold text-white">Welcome back</h2>
 
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-slate-400 hover:text-white transition-colors hover:bg-slate-800 rounded-lg">
+              <Link
+                href="/settings"
+                className="p-2 text-slate-400 hover:text-white transition-colors hover:bg-slate-800 rounded-lg"
+                aria-label="Settings"
+              >
                 <Settings size={20} />
-              </button>
+              </Link>
             </div>
           </div>
         </header>
