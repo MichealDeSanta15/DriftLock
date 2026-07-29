@@ -13,7 +13,7 @@ from backend.models.site import Site
 from backend.models.selector import Selector
 from backend.models.detection_event import DetectionEvent
 from backend.models.repair_outcome import RepairOutcome
-from backend.models.api_key import ApiKey
+from backend.models.api_key import APIKey
 
 
 class TestDatabaseConnection:
@@ -280,9 +280,9 @@ class TestModelOperations:
         assert retrieved.confidence == 92
 
     def test_create_api_key(self, db: Session):
-        """Test creating an ApiKey."""
+        """Test creating an APIKey."""
         owner_id = generate_uuid()
-        api_key = ApiKey(
+        api_key = APIKey(
             id=generate_uuid(),
             owner_id=owner_id,
             key_hash="sha256_hash_1234567890",
@@ -293,7 +293,7 @@ class TestModelOperations:
         db.commit()
 
         # Verify api key was saved
-        retrieved = db.query(ApiKey).filter_by(id=api_key.id).first()
+        retrieved = db.query(APIKey).filter_by(id=api_key.id).first()
         assert retrieved is not None
         assert retrieved.owner_id == owner_id
         assert retrieved.key_hash == "sha256_hash_1234567890"
