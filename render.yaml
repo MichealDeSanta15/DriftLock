@@ -6,6 +6,8 @@ services:
     buildCommand: pip install -r backend/requirements.txt
     startCommand: python -m backend.api
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: DATABASE_URL
         sync: false
       - key: FRONTEND_URL
