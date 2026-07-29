@@ -11,6 +11,7 @@ import { SelectorStatus } from '@/components/dashboard/SelectorStatus';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
+import { AddSiteModal } from '@/components/settings/Modals/AddSiteModal';
 import { triggerDetection, getSites, deleteSite, type Site } from '@/lib/api';
 import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
 import { supabase } from '@/lib/supabase';
@@ -29,8 +30,14 @@ export default function DashboardPage(): React.ReactElement {
   const [siteToDelete, setSiteToDelete] = useState<Site | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
   const reducedMotion = useReducedMotion();
   const subscriptionRef = useRef<{ unsubscribe: () => Promise<any> } | null>(null);
+  const sitesRef = useRef<Site[]>([]);
+
+  useEffect(() => {
+    sitesRef.current = sites;
+  }, [sites]);
 
   const upsertAlert = useCallback((id: string, data: Omit<ToastItem, 'id'>) => {
     setAlerts((prev) => {
@@ -131,7 +138,7 @@ export default function DashboardPage(): React.ReactElement {
               );
 
               upsertAlert(changeLog.selector_id, {
-                siteName: sites.find((s) => s.selectorId === changeLog.selector_id)?.name || 'Unknown',
+                siteName: sitesRef.current.find((s) => s.selectorId === changeLog.selector_id)?.name || 'Unknown',
                 selectorId: changeLog.selector_id,
                 status: 'success',
                 message: 'Selector repaired successfully!',
@@ -152,7 +159,7 @@ export default function DashboardPage(): React.ReactElement {
               );
 
               upsertAlert(changeLog.selector_id, {
-                siteName: sites.find((s) => s.selectorId === changeLog.selector_id)?.name || 'Unknown',
+                siteName: sitesRef.current.find((s) => s.selectorId === changeLog.selector_id)?.name || 'Unknown',
                 selectorId: changeLog.selector_id,
                 status: 'failed',
                 message: 'Repair failed. Manual review needed.',
@@ -176,7 +183,7 @@ export default function DashboardPage(): React.ReactElement {
         });
       }
     };
-  }, [sites, upsertAlert]);
+  }, [upsertAlert]);
 
   const handleTriggerDetection = useCallback(async (siteId: string) => {
     const site = sites.find((s) => s.id === siteId);
@@ -209,45 +216,80 @@ export default function DashboardPage(): React.ReactElement {
       log(`[${siteId}] Calling POST /api/sites/detect`);
       const result = await triggerDetection(siteId);
 
-      log(`[${siteId}] Detection completed, starting repair...`, {
+      log(`[${siteId}] Detection completed`, {
         detected: result.detected,
         confidence: result.confidence,
       });
 
-      upsertAlert(site.selectorId, {
-        siteName: site.name,
-        selectorId: site.selectorId,
-        status: 'repairing',
-        message: `Repairing ${result.detected ? 'broken' : 'found'} selectors...`,
-      });
+      const repaired = (result.metadata?.repaired as
+        | { newSelector: string | null; success: boolean }[]
+        | undefined) ?? [];
+      const changes = (result.metadata?.changes as
+        | { text: string; old_selector: string; new_selector: string }[]
+        | undefined) ?? [];
+      const successfulRepair = repaired.find((r) => r.success);
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      if (!result.detected) {
+        setSites((prevSites) =>
+          prevSites.map((s) =>
+            s.id === siteId ? { ...s, lastChecked: new Date().toISOString() } : s
+          )
+        );
+        upsertAlert(site.selectorId, {
+          siteName: site.name,
+          selectorId: site.selectorId,
+          status: 'success',
+          message: `No changes detected for ${site.name}`,
+        });
+      } else if (successfulRepair) {
+        setSites((prevSites) =>
+          prevSites.map((s) =>
+            s.id === siteId
+              ? {
+                  ...s,
+                  status: 'working' as const,
+                  lastChecked: new Date().toISOString(),
+                  lastRepaired: new Date().toISOString(),
+                  currentSelector: successfulRepair.newSelector || s.currentSelector,
+                }
+              : s
+          )
+        );
+        upsertAlert(site.selectorId, {
+          siteName: site.name,
+          selectorId: site.selectorId,
+          status: 'success',
+          message: `Successfully repaired selectors for ${site.name}`,
+        });
+      } else {
+        setSites((prevSites) =>
+          prevSites.map((s) =>
+            s.id === siteId
+              ? { ...s, status: 'failed' as const, lastChecked: new Date().toISOString() }
+              : s
+          )
+        );
+        let message: string;
+        if (repaired.length > 0) {
+          message = `Change detected but repair failed for ${site.name}. Manual review needed.`;
+        } else if (changes.length > 0) {
+          const summary = changes
+            .map((c) => `${c.old_selector} -> ${c.new_selector}`)
+            .join(', ');
+          message = `Detected selector change for ${site.name}: ${summary}`;
+        } else {
+          message = `Change detected for ${site.name}, but no specific selector change could be identified.`;
+        }
 
-      log(`[${siteId}] Repair completed, updating site status...`);
+        upsertAlert(site.selectorId, {
+          siteName: site.name,
+          selectorId: site.selectorId,
+          status: 'failed',
+          message,
+        });
+      }
 
-      setSites((prevSites) =>
-        prevSites.map((s) => {
-          if (s.id === siteId) {
-            const updatedSite = {
-              ...s,
-              status: 'working' as const,
-              lastChecked: new Date().toISOString(),
-            };
-            log(`[${siteId}] Updated site status to working`);
-            return updatedSite;
-          }
-          return s;
-        })
-      );
-
-      upsertAlert(site.selectorId, {
-        siteName: site.name,
-        selectorId: site.selectorId,
-        status: 'success',
-        message: `Successfully repaired selectors for ${site.name}`,
-      });
-
-      log(`[${siteId}] Detection and repair completed successfully`);
+      log(`[${siteId}] Detection flow completed`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       log(`[${siteId}] Detection failed with error`, { error: errorMessage });
@@ -274,8 +316,13 @@ export default function DashboardPage(): React.ReactElement {
   }, [sites, upsertAlert]);
 
   const handleAddSite = (): void => {
-    console.log('Add site clicked');
+    setShowAddModal(true);
   };
+
+  const handleAddSiteSuccess = useCallback((site: Site) => {
+    setSites((prev) => [site, ...prev]);
+    setShowAddModal(false);
+  }, []);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!siteToDelete) return;
@@ -494,6 +541,13 @@ export default function DashboardPage(): React.ReactElement {
           </div>
         )}
       </Modal>
+
+      {showAddModal && (
+        <AddSiteModal
+          onSuccess={handleAddSiteSuccess}
+          onCancel={() => setShowAddModal(false)}
+        />
+      )}
     </DashboardLayout>
   );
 }

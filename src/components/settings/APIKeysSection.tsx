@@ -25,7 +25,6 @@ export function APIKeysSection(): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchKeys();
@@ -77,15 +76,6 @@ export function APIKeysSection(): React.ReactElement {
     fetchKeys();
     setSuccessMessage('API key generated successfully!');
     setTimeout(() => setSuccessMessage(null), 3000);
-  };
-
-  const handleCopyKey = (keyId: string) => {
-    const key = keys.find((k) => k.id === keyId);
-    if (key) {
-      navigator.clipboard.writeText(keyId);
-      setCopiedKeyId(keyId);
-      setTimeout(() => setCopiedKeyId(null), 2000);
-    }
   };
 
   return (
@@ -199,12 +189,6 @@ export function APIKeysSection(): React.ReactElement {
                     <td className="px-6 py-4 flex gap-2">
                       {!key.revoked && (
                         <>
-                          <button
-                            onClick={() => handleCopyKey(key.id)}
-                            className="px-3 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition"
-                          >
-                            {copiedKeyId === key.id ? '✓ Copied' : 'Copy'}
-                          </button>
                           <button
                             onClick={() => handleRevokeKey(key.id)}
                             className="px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded hover:bg-red-100 dark:hover:bg-red-900/50 transition"
