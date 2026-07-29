@@ -7,7 +7,7 @@ from sqlalchemy import Column, String, DateTime, Boolean, Index
 from backend.models.base import Base, generate_uuid
 
 
-class ApiKey(Base):
+class APIKey(Base):
     """Stores hashed API keys for customer authentication.
 
     Keys are stored as hashes to prevent compromise if the database is breached.
