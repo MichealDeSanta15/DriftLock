@@ -21,23 +21,23 @@ export function SelectorStatus({
 }: SelectorStatusProps): React.ReactElement {
   const statusConfig = {
     working: {
-      bgColor: 'bg-green-100',
-      textColor: 'text-green-800',
-      badgeColor: 'bg-green-600',
+      bgColor: 'bg-green-100 dark:bg-green-900/30',
+      textColor: 'text-green-800 dark:text-green-300',
+      badgeColor: 'bg-green-600 dark:bg-green-600',
       icon: '✅',
       label: 'Working',
     },
     broken: {
-      bgColor: 'bg-yellow-100',
-      textColor: 'text-yellow-800',
-      badgeColor: 'bg-yellow-600',
+      bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
+      textColor: 'text-yellow-800 dark:text-yellow-300',
+      badgeColor: 'bg-yellow-600 dark:bg-yellow-600',
       icon: '⚠️',
       label: 'Broken',
     },
     failed: {
-      bgColor: 'bg-red-100',
-      textColor: 'text-red-800',
-      badgeColor: 'bg-red-600',
+      bgColor: 'bg-red-100 dark:bg-red-900/30',
+      textColor: 'text-red-800 dark:text-red-300',
+      badgeColor: 'bg-red-600 dark:bg-red-600',
       icon: '❌',
       label: 'Repair Failed',
     },
@@ -62,10 +62,10 @@ export function SelectorStatus({
           <p className={`text-sm font-medium ${config.textColor}`}>
             {config.icon} {config.label}
           </p>
-          <p className="text-xs text-gray-600 mt-1">ID: {selectorId}</p>
-          <p className="text-xs text-gray-600 mt-1 font-mono break-all">{currentSelector}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">ID: {selectorId}</p>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-mono break-all">{currentSelector}</p>
           {lastRepaired && (
-            <p className="text-xs text-gray-600 mt-2">
+            <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
               Last repaired: {new Date(lastRepaired).toLocaleString()}
             </p>
           )}
