@@ -1,7 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
+import { Modal } from '@/components/common/Modal';
+import { Button } from '@/components/common/Button';
+
+const CLOSE_ANIMATION_MS = 200;
 
 interface ConfirmDeleteModalProps {
   siteName: string;
@@ -16,8 +21,15 @@ export function ConfirmDeleteModal({
   onConfirm,
   onCancel,
 }: ConfirmDeleteModalProps): React.ReactElement {
+  const [open, setOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorPulse, setErrorPulse] = useState(0);
+
+  const requestClose = (after: () => void) => {
+    setOpen(false);
+    setTimeout(after, CLOSE_ANIMATION_MS);
+  };
 
   const handleConfirm = async () => {
     try {
@@ -34,59 +46,45 @@ export function ConfirmDeleteModal({
         throw new Error(data.error || 'Failed to delete site');
       }
 
-      onConfirm();
+      requestClose(onConfirm);
     } catch (err) {
       const apiError = parseAPIError(err);
       handleAPIError(err);
       setError(apiError.message);
-    } finally {
+      setErrorPulse((n) => n + 1);
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Delete Site</h3>
+    <Modal open={open} onClose={() => requestClose(onCancel)} title="Delete Site">
+      <div className="space-y-4">
+        {error && (
+          <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-3">
+            <p className="text-sm text-red-300">{error}</p>
+          </div>
+        )}
+
+        <p className="text-slate-300">
+          Are you sure you want to delete <strong className="text-white">{siteName}</strong>?
+        </p>
+
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-300">
+            This action cannot be undone. All associated selectors and data will be deleted.
+          </p>
         </div>
 
-        <div className="p-6 space-y-4">
-          {error && (
-            <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 p-3">
-              <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
-            </div>
-          )}
-
-          <p className="text-gray-700 dark:text-gray-300">
-            Are you sure you want to delete <strong>{siteName}</strong>?
-          </p>
-
-          <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 p-3">
-            <p className="text-sm text-yellow-800 dark:text-yellow-300">
-              ⚠️ This action cannot be undone. All associated selectors and data will be deleted.
-            </p>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={onCancel}
-              disabled={loading}
-              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              Delete Site
-            </button>
-          </div>
+        <div className="flex gap-3 pt-4">
+          <Button variant="secondary" className="flex-1" onClick={() => requestClose(onCancel)} disabled={loading}>
+            Cancel
+          </Button>
+          <Button variant="danger" className="flex-1" loading={loading} errorPulse={errorPulse} onClick={handleConfirm}>
+            Delete Site
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

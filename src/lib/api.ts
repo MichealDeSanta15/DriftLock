@@ -91,3 +91,7 @@ export async function listDetections(siteId?: string): Promise<DetectionResult[]
 export async function getSelectorHistory(selectorId: string): Promise<SelectorUpdate[]> {
   return fetchAPI<SelectorUpdate[]>(`/api/selectors/${selectorId}/history`);
 }
+
+export async function deleteSite(siteId: string): Promise<void> {
+  await fetchAPI<{ success: boolean }>(`/api/sites/${siteId}`, { method: 'DELETE' });
+}
