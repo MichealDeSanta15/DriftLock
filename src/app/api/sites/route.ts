@@ -4,6 +4,10 @@ import { getSites as getDbSites } from '@/lib/supabase';
 import { supabase } from '@/lib/supabase';
 import { type Site as ApiSite } from '@/lib/api';
 
+function generateUUID(): string {
+  return crypto.randomUUID();
+}
+
 export async function GET(_req: NextRequest): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
   const log = createRequestLogger(requestId);
@@ -87,6 +91,57 @@ export async function GET(_req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         error: 'Failed to fetch sites',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const requestId = crypto.randomUUID();
+  const log = createRequestLogger(requestId);
+
+  try {
+    const { name, url } = await req.json();
+    log.info({ name, url }, 'Creating new site');
+
+    if (!name || !url) {
+      return NextResponse.json({ error: 'Name and URL are required' }, { status: 400 });
+    }
+
+    const siteId = generateUUID();
+
+    const { error } = await supabase.from('sites').insert({
+      id: siteId,
+      name,
+      url,
+      is_active: true,
+      owner_id: 'user-placeholder',
+    });
+
+    if (error) {
+      log.error({ error }, 'Failed to create site');
+      throw error;
+    }
+
+    const newSite: ApiSite = {
+      id: siteId,
+      name,
+      url,
+      status: 'working',
+      lastChecked: new Date().toISOString(),
+      selectorId: 'unknown',
+      currentSelector: 'Not set',
+    };
+
+    log.info({ siteId }, 'Site created successfully');
+    return NextResponse.json(newSite, { status: 201 });
+  } catch (error) {
+    log.error({ error }, 'Error creating site');
+    return NextResponse.json(
+      {
+        error: 'Failed to create site',
         details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
