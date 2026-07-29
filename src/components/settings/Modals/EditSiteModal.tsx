@@ -1,8 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { type Site } from '@/lib/api';
 import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
+import { Modal } from '@/components/common/Modal';
+import { Button } from '@/components/common/Button';
+import { FormField } from '@/components/common/FormField';
+
+const CLOSE_ANIMATION_MS = 200;
 
 interface EditSiteModalProps {
   site: Site;
@@ -11,11 +17,19 @@ interface EditSiteModalProps {
 }
 
 export function EditSiteModal({ site, onSuccess, onCancel }: EditSiteModalProps): React.ReactElement {
+  const [open, setOpen] = useState(true);
   const [name, setName] = useState(site.name);
   const [url, setUrl] = useState(site.url);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<{ name?: string; url?: string }>({});
+  const [errorPulse, setErrorPulse] = useState(0);
+
+  const requestClose = (after: () => void) => {
+    setOpen(false);
+    setTimeout(after, CLOSE_ANIMATION_MS);
+  };
 
   const validateForm = (): boolean => {
     const newErrors: { name?: string; url?: string } = {};
@@ -39,6 +53,7 @@ export function EditSiteModal({ site, onSuccess, onCancel }: EditSiteModalProps)
     setError(null);
 
     if (!validateForm()) {
+      setErrorPulse((n) => n + 1);
       return;
     }
 
@@ -56,82 +71,61 @@ export function EditSiteModal({ site, onSuccess, onCancel }: EditSiteModalProps)
       }
 
       const updatedSite = await response.json();
-      onSuccess(updatedSite);
+      setLoading(false);
+      setSuccess(true);
+      setTimeout(() => requestClose(() => onSuccess(updatedSite)), 500);
     } catch (err) {
       const apiError = parseAPIError(err);
       handleAPIError(err);
       setError(apiError.message);
-    } finally {
+      setErrorPulse((n) => n + 1);
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Site</h3>
+    <Modal open={open} onClose={() => requestClose(onCancel)} title="Edit Site">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <div className="flex items-start gap-3 rounded-lg bg-red-500/10 border border-red-500/30 p-3">
+            <AlertCircle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-red-300">{error}</p>
+          </div>
+        )}
+
+        <FormField
+          label="Site Name"
+          name="name"
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          error={errors.name}
+        />
+
+        <FormField
+          label="Site URL"
+          name="url"
+          type="url"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          error={errors.url}
+        />
+
+        <div className="flex gap-3 pt-4">
+          <Button
+            type="button"
+            variant="secondary"
+            className="flex-1"
+            onClick={() => requestClose(onCancel)}
+            disabled={loading || success}
+          >
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" className="flex-1" loading={loading} success={success} errorPulse={errorPulse}>
+            {success ? 'Updated!' : 'Update Site'}
+          </Button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && (
-            <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 p-3">
-              <p className="text-sm text-red-800 dark:text-red-300">{error}</p>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Site Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white transition ${
-                errors.name
-                  ? 'border-red-500 dark:border-red-500'
-                  : 'border-gray-300 dark:border-gray-600'
-              }`}
-            />
-            {errors.name && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.name}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Site URL
-            </label>
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              className={`w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white transition ${
-                errors.url ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
-              }`}
-            />
-            {errors.url && <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.url}</p>}
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={loading}
-              className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              Update Site
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 }

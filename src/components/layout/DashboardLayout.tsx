@@ -2,7 +2,9 @@
 
 import React, { ReactNode, useState } from 'react';
 import Link from 'next/link';
+import { AnimatePresence, motion } from 'framer-motion';
 import { LayoutDashboard, Globe, Settings, LogOut, Menu, X, Key } from 'lucide-react';
+import { useReducedMotion } from '@/lib/motion';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -10,6 +12,8 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps): React.ReactElement {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const reducedMotion = useReducedMotion();
 
   return (
     <div className="flex h-screen bg-slate-950">
@@ -47,13 +51,42 @@ export function DashboardLayout({ children }: DashboardLayoutProps): React.React
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top navbar */}
-        <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
+        <header
+          className={`bg-slate-900 border-b sticky top-0 z-40 transition-shadow duration-300 ${
+            scrolled ? 'border-slate-800 shadow-lg shadow-black/20' : 'border-transparent shadow-none'
+          }`}
+        >
           <div className="px-6 py-4 flex items-center justify-between">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="lg:hidden p-2 text-slate-400 hover:text-white transition-colors"
+              className="lg:hidden relative w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
+              aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
             >
-              {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+              <AnimatePresence mode="wait" initial={false}>
+                {sidebarOpen ? (
+                  <motion.span
+                    key="close"
+                    initial={reducedMotion ? undefined : { rotate: -90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <X size={24} />
+                  </motion.span>
+                ) : (
+                  <motion.span
+                    key="menu"
+                    initial={reducedMotion ? undefined : { rotate: 90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: -90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <Menu size={24} />
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
 
             <h2 className="text-lg font-semibold text-white">Welcome back</h2>
@@ -67,7 +100,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps): React.React
         </header>
 
         {/* Page content */}
-        <div className="flex-1 overflow-auto">
+        <div
+          className="flex-1 overflow-auto"
+          onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 8)}
+        >
           <div className="px-6 lg:px-8 py-6">
             {children}
           </div>
@@ -75,12 +111,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps): React.React
       </main>
 
       {/* Mobile overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

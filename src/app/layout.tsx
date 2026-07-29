@@ -1,6 +1,8 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
+import { AuroraBackground } from '@/components/common/AuroraBackground';
+import { PageTransition } from '@/components/common/PageTransition';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -11,11 +13,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'DriftLock — Selector Repair for Web Scrapers',
   description: 'Automatically repair broken selectors when websites redesign',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-  },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 interface RootLayoutProps {
@@ -26,8 +29,9 @@ export default function RootLayout({ children }: RootLayoutProps): React.ReactEl
   return (
     <html lang="en" className={`${inter.variable} dark`}>
       <body className="bg-slate-950 text-white font-sans antialiased">
+        <AuroraBackground intensity="subtle" />
         <div className="min-h-screen">
-          {children}
+          <PageTransition>{children}</PageTransition>
         </div>
       </body>
     </html>

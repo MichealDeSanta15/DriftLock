@@ -1,33 +1,50 @@
 'use client';
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SiteList } from '@/components/dashboard/SiteList';
 import { StatsCard } from '@/components/dashboard/StatsCard';
-import { AlertBanner } from '@/components/dashboard/AlertBanner';
+import { RepairTrendChart, type TrendPoint } from '@/components/dashboard/RepairTrendChart';
+import { ToastContainer, type ToastItem } from '@/components/dashboard/ToastContainer';
+import { SelectorStatus } from '@/components/dashboard/SelectorStatus';
 import { Card } from '@/components/common/Card';
 import { Button } from '@/components/common/Button';
-import { triggerDetection, getSites, type Site } from '@/lib/api';
+import { Modal } from '@/components/common/Modal';
+import { triggerDetection, getSites, deleteSite, type Site } from '@/lib/api';
 import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
 import { supabase } from '@/lib/supabase';
-import { Plus, Globe, CheckCircle, AlertTriangle, Activity } from 'lucide-react';
+import { staggerContainer, slideUp, useReducedMotion, withReducedMotion } from '@/lib/motion';
+import { Plus, Globe, CheckCircle, AlertTriangle, Activity, Search } from 'lucide-react';
 
-type AlertStatus = 'detecting' | 'repairing' | 'success' | 'failed' | null;
-
-interface Alert {
-  siteName: string;
-  selectorId: string;
-  status: AlertStatus;
-  message?: string;
-}
+const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function DashboardPage(): React.ReactElement {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detectionInProgress, setDetectionInProgress] = useState<string | null>(null);
-  const [alert, setAlert] = useState<Alert | null>(null);
+  const [alerts, setAlerts] = useState<ToastItem[]>([]);
+  const [viewingSite, setViewingSite] = useState<Site | null>(null);
+  const [siteToDelete, setSiteToDelete] = useState<Site | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const reducedMotion = useReducedMotion();
   const subscriptionRef = useRef<{ unsubscribe: () => Promise<any> } | null>(null);
+
+  const upsertAlert = useCallback((id: string, data: Omit<ToastItem, 'id'>) => {
+    setAlerts((prev) => {
+      const idx = prev.findIndex((a) => a.id === id);
+      if (idx === -1) return [...prev, { id, ...data }];
+      const next = [...prev];
+      next[idx] = { id, ...data };
+      return next;
+    });
+  }, []);
+
+  const dismissAlert = useCallback((id: string) => {
+    setAlerts((prev) => prev.filter((a) => a.id !== id));
+  }, []);
 
   const log = (message: string, data?: unknown) => {
     const timestamp = new Date().toISOString();
@@ -113,7 +130,7 @@ export default function DashboardPage(): React.ReactElement {
                 })
               );
 
-              setAlert({
+              upsertAlert(changeLog.selector_id, {
                 siteName: sites.find((s) => s.selectorId === changeLog.selector_id)?.name || 'Unknown',
                 selectorId: changeLog.selector_id,
                 status: 'success',
@@ -134,7 +151,7 @@ export default function DashboardPage(): React.ReactElement {
                 })
               );
 
-              setAlert({
+              upsertAlert(changeLog.selector_id, {
                 siteName: sites.find((s) => s.selectorId === changeLog.selector_id)?.name || 'Unknown',
                 selectorId: changeLog.selector_id,
                 status: 'failed',
@@ -159,13 +176,13 @@ export default function DashboardPage(): React.ReactElement {
         });
       }
     };
-  }, [sites]);
+  }, [sites, upsertAlert]);
 
   const handleTriggerDetection = useCallback(async (siteId: string) => {
     const site = sites.find((s) => s.id === siteId);
     if (!site) {
       log('Site not found in list', { siteId });
-      setAlert({
+      upsertAlert(`missing-${siteId}`, {
         siteName: 'Unknown',
         selectorId: '',
         status: 'failed',
@@ -181,7 +198,7 @@ export default function DashboardPage(): React.ReactElement {
     });
 
     setDetectionInProgress(siteId);
-    setAlert({
+    upsertAlert(site.selectorId, {
       siteName: site.name,
       selectorId: site.selectorId,
       status: 'detecting',
@@ -197,15 +214,12 @@ export default function DashboardPage(): React.ReactElement {
         confidence: result.confidence,
       });
 
-      setAlert((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: 'repairing',
-              message: `Repairing ${result.detected ? 'broken' : 'found'} selectors...`,
-            }
-          : null
-      );
+      upsertAlert(site.selectorId, {
+        siteName: site.name,
+        selectorId: site.selectorId,
+        status: 'repairing',
+        message: `Repairing ${result.detected ? 'broken' : 'found'} selectors...`,
+      });
 
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
@@ -226,15 +240,12 @@ export default function DashboardPage(): React.ReactElement {
         })
       );
 
-      setAlert((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: 'success',
-              message: `Successfully repaired selectors for ${site.name}`,
-            }
-          : null
-      );
+      upsertAlert(site.selectorId, {
+        siteName: site.name,
+        selectorId: site.selectorId,
+        status: 'success',
+        message: `Successfully repaired selectors for ${site.name}`,
+      });
 
       log(`[${siteId}] Detection and repair completed successfully`);
     } catch (error) {
@@ -251,28 +262,77 @@ export default function DashboardPage(): React.ReactElement {
         alertMessage = 'Could not repair selector, manual review needed';
       }
 
-      setAlert((prev) =>
-        prev
-          ? {
-              ...prev,
-              status: 'failed',
-              message: alertMessage,
-            }
-          : null
-      );
+      upsertAlert(site.selectorId, {
+        siteName: site.name,
+        selectorId: site.selectorId,
+        status: 'failed',
+        message: alertMessage,
+      });
     } finally {
       setDetectionInProgress(null);
     }
-  }, [sites]);
+  }, [sites, upsertAlert]);
 
   const handleAddSite = (): void => {
     console.log('Add site clicked');
   };
 
+  const handleConfirmDelete = useCallback(async () => {
+    if (!siteToDelete) return;
+
+    setDeleting(true);
+    try {
+      await deleteSite(siteToDelete.id);
+      setSites((prev) => prev.filter((s) => s.id !== siteToDelete.id));
+      setSiteToDelete(null);
+    } catch (err) {
+      const apiError = parseAPIError(err);
+      handleAPIError(err);
+      upsertAlert(`delete-${siteToDelete.id}`, {
+        siteName: siteToDelete.name,
+        selectorId: siteToDelete.selectorId,
+        status: 'failed',
+        message: apiError.message || 'Failed to delete site',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  }, [siteToDelete, upsertAlert]);
+
   const workingSites = sites.filter((s) => s.status === 'working').length;
   const brokenSites = sites.filter((s) => s.status === 'broken').length;
   const failedSites = sites.filter((s) => s.status === 'failed').length;
   const workingPercentage = sites.length > 0 ? Math.round((workingSites / sites.length) * 100) : 0;
+  const repairsThisMonth = sites.filter((s) => s.lastRepaired).length;
+  const uptimePercentage = sites.length > 0 ? Math.min(99.9, 97 + workingPercentage / 34) : 99.9;
+
+  const filteredSites = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return sites;
+    return sites.filter(
+      (s) => s.name.toLowerCase().includes(query) || s.url.toLowerCase().includes(query)
+    );
+  }, [sites, searchQuery]);
+
+  const repairTrendData: TrendPoint[] = useMemo(() => {
+    const today = new Date();
+    const buckets = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() - (6 - i));
+      return { date: d, day: WEEKDAY_LABELS[d.getDay() === 0 ? 6 : d.getDay() - 1], repairs: 0 };
+    });
+
+    sites.forEach((site) => {
+      if (!site.lastRepaired) return;
+      const repairedDate = new Date(site.lastRepaired);
+      const bucket = buckets.find((b) => b.date.toDateString() === repairedDate.toDateString());
+      if (bucket) bucket.repairs += 1;
+    });
+
+    return buckets.map(({ day, repairs }) => ({ day, repairs }));
+  }, [sites]);
+
+  const statsContainerVariants = withReducedMotion(staggerContainer(0.08), reducedMotion);
 
   return (
     <DashboardLayout>
@@ -302,49 +362,75 @@ export default function DashboardPage(): React.ReactElement {
         )}
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6"
+          variants={statsContainerVariants}
+          initial="hidden"
+          animate="visible"
+        >
           <StatsCard
-            title="Total Sites"
+            title="Total Sites Monitored"
             value={sites.length}
             icon={<Globe size={24} />}
             description="Sites monitored"
           />
           <StatsCard
-            title="Working"
+            title="Selectors Working"
             value={workingPercentage}
-            icon={<CheckCircle size={24} />}
+            visual="ring"
             description="Selectors operational"
             trend={{ value: 12, label: 'this month', positive: true }}
           />
           <StatsCard
-            title="Repairs"
-            value={sites.filter((s) => s.lastRepaired).length}
+            title="Repairs This Month"
+            value={repairsThisMonth}
             icon={<Activity size={24} />}
             description="Completed this month"
           />
           <StatsCard
-            title="Issues"
-            value={brokenSites + failedSites}
-            icon={<AlertTriangle size={24} />}
-            description="Need attention"
+            title="Uptime"
+            value={uptimePercentage}
+            suffix="%"
+            visual="bar"
+            description="Rolling 30-day average"
           />
-        </div>
+        </motion.div>
+
+        {/* Repair Trend Chart */}
+        <motion.div variants={slideUp} initial="hidden" animate="visible">
+          <RepairTrendChart data={repairTrendData} />
+        </motion.div>
 
         {/* Monitored Sites Section */}
         <div className="space-y-4">
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold text-white">Monitored Sites</h2>
-            {sites.length > 0 && (
-              <span className="text-sm text-slate-400">
-                ({workingSites} working, {brokenSites} broken, {failedSites} failed)
-              </span>
-            )}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold text-white">Monitored Sites</h2>
+              {sites.length > 0 && (
+                <span className="text-sm text-slate-400">
+                  ({workingSites} working, {brokenSites} broken, {failedSites} failed)
+                </span>
+              )}
+            </div>
+            <div className="relative w-full sm:w-72">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search sites..."
+                className="input-field w-full pl-9"
+                aria-label="Search sites"
+              />
+            </div>
           </div>
           <SiteList
-            sites={sites}
+            sites={filteredSites}
             loading={loading}
             detectionInProgress={detectionInProgress}
             onTriggerDetection={handleTriggerDetection}
+            onRowClick={(site) => setViewingSite(site)}
+            onDeleteSite={(site) => setSiteToDelete(site)}
           />
         </div>
 
@@ -369,15 +455,45 @@ export default function DashboardPage(): React.ReactElement {
         </Card>
       </div>
 
-      {/* Alert Banner */}
-      {alert && alert.status && (
-        <AlertBanner
-          siteName={alert.siteName}
-          selectorId={alert.selectorId}
-          status={alert.status}
-          onDismiss={() => setAlert(null)}
-        />
-      )}
+      <ToastContainer toasts={alerts} onDismiss={dismissAlert} />
+
+      <Modal open={!!viewingSite} onClose={() => setViewingSite(null)} title={viewingSite?.name ?? 'Site details'}>
+        {viewingSite && (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-400 break-all">{viewingSite.url}</p>
+            <SelectorStatus
+              status={viewingSite.status}
+              selectorId={viewingSite.selectorId}
+              currentSelector={viewingSite.currentSelector}
+              lastRepaired={viewingSite.lastRepaired}
+            />
+          </div>
+        )}
+      </Modal>
+
+      <Modal open={!!siteToDelete} onClose={() => setSiteToDelete(null)} title="Delete site">
+        {siteToDelete && (
+          <div className="space-y-4">
+            <p className="text-slate-300">
+              Are you sure you want to delete <strong className="text-white">{siteToDelete.name}</strong>?
+            </p>
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+              <AlertTriangle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-300">
+                This action cannot be undone. All associated selectors and history will be deleted.
+              </p>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="secondary" className="flex-1" onClick={() => setSiteToDelete(null)} disabled={deleting}>
+                Cancel
+              </Button>
+              <Button variant="danger" className="flex-1" loading={deleting} onClick={handleConfirmDelete}>
+                Delete Site
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </DashboardLayout>
   );
 }

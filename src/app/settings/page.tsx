@@ -1,16 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
+import { motion, AnimatePresence, type Variants } from 'framer-motion';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SiteManagement } from '@/components/settings/SiteManagement';
 import { APIKeysSection } from '@/components/settings/APIKeysSection';
 import { BillingSection } from '@/components/settings/BillingSection';
 import { Globe, Key, CreditCard } from 'lucide-react';
+import { EASE_OUT, useReducedMotion, withReducedMotion } from '@/lib/motion';
 
 type SettingsTab = 'sites' | 'api-keys' | 'billing';
 
+const panelVariants: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: EASE_OUT } },
+  exit: { opacity: 0, y: -8, transition: { duration: 0.15 } },
+};
+
 export default function SettingsPage(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<SettingsTab>('sites');
+  const reducedMotion = useReducedMotion();
 
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
     { id: 'sites', label: 'Site Management', icon: <Globe size={20} /> },
@@ -36,14 +45,19 @@ export default function SettingsPage(): React.ReactElement {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-3 whitespace-nowrap lg:w-full px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
-                    activeTab === tab.id
-                      ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                      : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
+                  className={`relative flex items-center gap-3 whitespace-nowrap lg:w-full px-4 py-3 rounded-lg font-medium transition-colors duration-300 ${
+                    activeTab === tab.id ? 'text-indigo-400' : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
                   }`}
                 >
-                  {tab.icon}
-                  <span>{tab.label}</span>
+                  {activeTab === tab.id && (
+                    <motion.div
+                      layoutId="settings-tab-indicator"
+                      className="absolute inset-0 bg-indigo-600/20 border border-indigo-500/30 rounded-lg"
+                      transition={reducedMotion ? { duration: 0.01 } : { type: 'spring', stiffness: 400, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative z-10">{tab.icon}</span>
+                  <span className="relative z-10">{tab.label}</span>
                 </button>
               ))}
             </nav>
@@ -51,11 +65,20 @@ export default function SettingsPage(): React.ReactElement {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <div className="space-y-6">
-              {activeTab === 'sites' && <SiteManagement />}
-              {activeTab === 'api-keys' && <APIKeysSection />}
-              {activeTab === 'billing' && <BillingSection />}
-            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                variants={withReducedMotion(panelVariants, reducedMotion)}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+                className="space-y-6"
+              >
+                {activeTab === 'sites' && <SiteManagement />}
+                {activeTab === 'api-keys' && <APIKeysSection />}
+                {activeTab === 'billing' && <BillingSection />}
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </div>
