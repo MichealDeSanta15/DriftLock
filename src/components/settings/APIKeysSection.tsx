@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
+import { SkeletonLoader } from '@/components/common/SkeletonLoader';
 import { GenerateKeyModal } from './Modals/GenerateKeyModal';
 
 interface APIKey {
@@ -39,7 +41,9 @@ export function APIKeysSection(): React.ReactElement {
       const data = await response.json();
       setKeys(data.keys || []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch API keys');
+      const apiError = parseAPIError(err);
+      handleAPIError(err);
+      setError(apiError.message);
     } finally {
       setLoading(false);
     }
@@ -120,15 +124,22 @@ export function APIKeysSection(): React.ReactElement {
 
       {/* Error Message */}
       {error && (
-        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 p-4">
+        <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 p-4 flex items-center justify-between">
           <p className="text-sm text-red-800 dark:text-red-300">❌ {error}</p>
+          <button
+            onClick={fetchKeys}
+            className="ml-4 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 rounded hover:bg-red-200 dark:hover:bg-red-900/60 transition"
+            aria-label="Retry loading API keys"
+          >
+            Retry
+          </button>
         </div>
       )}
 
       {/* Loading State */}
       {loading ? (
-        <div className="text-center py-12">
-          <p className="text-gray-500 dark:text-gray-400">Loading API keys...</p>
+        <div className="space-y-4">
+          <SkeletonLoader type="table-row" count={3} />
         </div>
       ) : keys.length === 0 ? (
         <div className="text-center py-12 rounded-lg bg-gray-50 dark:bg-gray-800">

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { type Site } from '@/lib/api';
+import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
 
 interface EditSiteModalProps {
   site: Site;
@@ -57,7 +58,9 @@ export function EditSiteModal({ site, onSuccess, onCancel }: EditSiteModalProps)
       const updatedSite = await response.json();
       onSuccess(updatedSite);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update site');
+      const apiError = parseAPIError(err);
+      handleAPIError(err);
+      setError(apiError.message);
     } finally {
       setLoading(false);
     }
