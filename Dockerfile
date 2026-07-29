@@ -1,9 +1,7 @@
-"""Dockerfile for DriftLock Python backend.
-
-Multi-stage build for production-ready container with minimal size.
-"""
-
 FROM python:3.11-slim
+
+# Dockerfile for DriftLock Python backend
+# Multi-stage build for production-ready container with minimal size
 
 # Set working directory
 WORKDIR /app
