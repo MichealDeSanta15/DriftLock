@@ -6,7 +6,7 @@ Covers: backup selectors, JSON-LD parsing, and reverse-search strategies.
 
 import pytest
 
-from backend.repair.selector_repair import (
+from ..repair.selector_repair import (
     try_backup_selectors,
     parse_json_ld,
     reverse_search,

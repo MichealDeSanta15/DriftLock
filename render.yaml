@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: driftlock-backend
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python -m backend.api
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: LOG_LEVEL
+        value: INFO
+      - key: SQL_ECHO
+        value: "false"

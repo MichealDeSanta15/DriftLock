@@ -1,11 +1,11 @@
 """SQLAlchemy ORM models for DriftLock."""
 
-from backend.models.base import Base
-from backend.models.site import Site
-from backend.models.selector import Selector
-from backend.models.detection_event import DetectionEvent
-from backend.models.repair_outcome import RepairOutcome
-from backend.models.api_key import APIKey
+from .base import Base
+from .site import Site
+from .selector import Selector
+from .detection_event import DetectionEvent
+from .repair_outcome import RepairOutcome
+from .api_key import APIKey
 
 __all__ = [
     "Base",

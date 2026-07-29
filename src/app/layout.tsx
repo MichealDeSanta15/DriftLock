@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 import { AuroraBackground } from '@/components/common/AuroraBackground';
 import { PageTransition } from '@/components/common/PageTransition';
+import { AuthProvider } from '@/lib/AuthContext';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -31,7 +32,9 @@ export default function RootLayout({ children }: RootLayoutProps): React.ReactEl
       <body className="bg-slate-950 text-white font-sans antialiased">
         <AuroraBackground intensity="subtle" />
         <div className="min-h-screen">
-          <PageTransition>{children}</PageTransition>
+          <AuthProvider>
+            <PageTransition>{children}</PageTransition>
+          </AuthProvider>
         </div>
       </body>
     </html>

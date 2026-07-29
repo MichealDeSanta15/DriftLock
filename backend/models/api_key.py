@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import Column, String, DateTime, Boolean, Index
 
-from backend.models.base import Base, generate_uuid
+from .base import Base, generate_uuid
 
 
 class APIKey(Base):

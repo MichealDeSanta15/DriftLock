@@ -4,11 +4,17 @@ Sets up the database context for migrations using SQLAlchemy models.
 """
 
 import os
+import sys
 from logging.config import fileConfig
 
 from alembic import context
 from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
+
+# env.py is exec'd standalone by Alembic (not imported as part of the
+# `backend` package), so relative imports don't work here. Put the repo
+# root on sys.path so `backend` can be imported absolutely.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from backend.models.base import Base
 

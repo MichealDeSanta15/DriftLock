@@ -19,6 +19,7 @@ export function AddSiteModal({ onSuccess, onCancel }: AddSiteModalProps): React.
   const [open, setOpen] = useState(true);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+  const [selector, setSelector] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +62,7 @@ export function AddSiteModal({ onSuccess, onCancel }: AddSiteModalProps): React.
       const response = await fetch('/api/sites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, url }),
+        body: JSON.stringify({ name, url, selector: selector.trim() || undefined }),
       });
 
       if (!response.ok) {
@@ -110,6 +111,15 @@ export function AddSiteModal({ onSuccess, onCancel }: AddSiteModalProps): React.
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com"
           error={errors.url}
+        />
+
+        <FormField
+          label="CSS Selector (optional)"
+          name="selector"
+          type="text"
+          value={selector}
+          onChange={(e) => setSelector(e.target.value)}
+          placeholder="e.g., h1.product-title"
         />
 
         <div className="flex gap-3 pt-4">

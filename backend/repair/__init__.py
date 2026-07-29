@@ -6,7 +6,7 @@ Repairs using a cascade:
 3. Reverse-search (find old content in new HTML)
 """
 
-from backend.repair.selector_repair import (
+from .selector_repair import (
     RepairResult,
     repair_selector,
     try_backup_selectors,

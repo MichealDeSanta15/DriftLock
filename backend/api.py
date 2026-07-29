@@ -4,7 +4,7 @@ Exposes the Python backend functions as HTTP endpoints that Next.js can call.
 
 Usage:
     python -m pip install fastapi uvicorn
-    python backend/api.py
+    python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
 
 Server will run on http://localhost:8000
 
@@ -12,6 +12,7 @@ Endpoints:
     GET /health - Health check
     GET /api/sites - Get all sites
     POST /api/sites - Create a new site
+    PUT /api/sites/{site_id} - Update a site
     DELETE /api/sites/{site_id} - Delete a site
     POST /api/sites/detect - Detect website changes
     GET /api/selectors/{selector_id}/current - Get current selector
@@ -21,16 +22,27 @@ Endpoints:
 """
 
 import logging
+import os
 import sys
 from typing import Optional
-from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Path
+from fastapi import Depends, FastAPI, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from backend.detection import detect_changes, create_snapshot
-from backend.repair import repair_selector
+from .db import get_db
+from .detection import detect_changes, create_snapshot, diff_selectors
+from .detection.site_monitor import fetch_page
+from .models.base import utc_now
+from .models.detection_event import DetectionEvent
+from .models.repair_outcome import RepairOutcome
+from .models.selector import Selector
+from .models.site import Site
+from .repair import repair_selector
+
+# TODO: replace with the authenticated user's ID once auth is wired up.
+PLACEHOLDER_OWNER_ID = "user-placeholder"
 
 # Setup logging
 logging.basicConfig(
@@ -45,10 +57,15 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Enable CORS for Next.js
+# Enable CORS for Next.js. FRONTEND_URL should be set to the deployed
+# Vercel URL in production; defaults keep local dev working.
+_default_origins = ["http://localhost:3000", "http://localhost:3001"]
+_frontend_url = os.environ.get("FRONTEND_URL")
+_allow_origins = _default_origins + [_frontend_url] if _frontend_url else _default_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -121,10 +138,11 @@ class SiteResponse(BaseModel):
 
 
 class CreateSiteRequest(BaseModel):
-    """Request to create a site."""
+    """Request to create or update a site."""
 
     name: str
     url: str
+    selector: Optional[str] = None
 
 
 class SitesListResponse(BaseModel):
@@ -264,25 +282,57 @@ async def health():
     return {"status": "ok", "service": "driftlock-backend"}
 
 
+def _site_to_response(site: Site) -> SiteResponse:
+    """Build a SiteResponse from a Site ORM row, using its current selector if any."""
+    current_selector = next(
+        (s for s in site.selectors if s.is_current), site.selectors[0] if site.selectors else None
+    )
+
+    status = "working"
+    if current_selector is not None and current_selector.repair_status == "failed":
+        status = "failed"
+    elif current_selector is not None and current_selector.repair_status == "broken":
+        status = "broken"
+
+    return SiteResponse(
+        id=site.id,
+        name=site.name,
+        url=site.url,
+        status=status,
+        lastChecked=site.updated_at.isoformat(),
+        selectorId=current_selector.id if current_selector else "unknown",
+        currentSelector=current_selector.selector_key if current_selector else "Not set",
+        lastRepaired=(
+            current_selector.last_repaired_at.isoformat()
+            if current_selector and current_selector.last_repaired_at
+            else None
+        ),
+    )
+
+
 @app.get("/api/sites", response_model=SitesListResponse)
-async def get_sites():
-    """Get all sites.
+async def get_sites(db: Session = Depends(get_db)):
+    """Get all active sites.
 
     Returns:
         List of sites with their status and selector information
     """
     try:
         logger.info("GET /api/sites - Fetching all sites")
-        # TODO: Connect to database and fetch sites
-        # For now, return empty list to match frontend behavior
-        return SitesListResponse(sites=[])
+        sites = (
+            db.query(Site)
+            .filter(Site.is_active.is_(True))
+            .order_by(Site.updated_at.desc())
+            .all()
+        )
+        return SitesListResponse(sites=[_site_to_response(site) for site in sites])
     except Exception as e:
         logger.error(f"Failed to fetch sites: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/sites", response_model=SiteResponse)
-async def create_site(req: CreateSiteRequest):
+async def create_site(req: CreateSiteRequest, db: Session = Depends(get_db)):
     """Create a new site.
 
     Args:
@@ -293,23 +343,25 @@ async def create_site(req: CreateSiteRequest):
     """
     try:
         logger.info(f"POST /api/sites - Creating site: {req.name}")
-        site_id = str(uuid4())
-        return SiteResponse(
-            id=site_id,
-            name=req.name,
-            url=req.url,
-            status="working",
-            lastChecked="2025-01-01T00:00:00Z",
-            selectorId="unknown",
-            currentSelector="Not set",
-        )
+        site = Site(name=req.name, url=req.url, owner_id=PLACEHOLDER_OWNER_ID)
+        db.add(site)
+        db.flush()
+
+        if req.selector:
+            selector = Selector(site_id=site.id, selector_key=req.selector, is_current=True)
+            db.add(selector)
+
+        db.commit()
+        db.refresh(site)
+        return _site_to_response(site)
     except Exception as e:
+        db.rollback()
         logger.error(f"Failed to create site: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.delete("/api/sites/{site_id}")
-async def delete_site(site_id: str = Path(...)):
+async def delete_site(site_id: str = Path(...), db: Session = Depends(get_db)):
     """Delete a site.
 
     Args:
@@ -320,32 +372,176 @@ async def delete_site(site_id: str = Path(...)):
     """
     try:
         logger.info(f"DELETE /api/sites/{site_id} - Deleting site")
-        # TODO: Connect to database and delete site
+        site = db.query(Site).filter(Site.id == site_id).first()
+        if site is None:
+            raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+
+        site.is_active = False
+        db.commit()
         return {"success": True, "message": f"Site {site_id} deleted"}
+    except HTTPException:
+        raise
     except Exception as e:
+        db.rollback()
         logger.error(f"Failed to delete site {site_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.put("/api/sites/{site_id}", response_model=SiteResponse)
+async def update_site(req: CreateSiteRequest, site_id: str = Path(...), db: Session = Depends(get_db)):
+    """Update a site's name and URL.
+
+    Args:
+        site_id: The site ID to update
+        req: New name and URL
+
+    Returns:
+        Updated site
+    """
+    try:
+        logger.info(f"PUT /api/sites/{site_id} - Updating site")
+        site = db.query(Site).filter(Site.id == site_id).first()
+        if site is None:
+            raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+
+        site.name = req.name
+        site.url = req.url
+        db.commit()
+        db.refresh(site)
+        return _site_to_response(site)
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to update site {site_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/sites/detect")
-async def detect_site_changes(req: DetectAPIRequest):
-    """Trigger detection on a site.
+async def detect_site_changes(req: DetectAPIRequest, db: Session = Depends(get_db)):
+    """Run detection (and repair, if a change is found) for a site.
+
+    On the first call for a site there is no baseline snapshot yet, so this
+    just captures one and returns detected=False. Subsequent calls compare
+    against the stored baseline, and on detecting a change, attempt to
+    repair the site's current selector.
 
     Args:
         req: Detection request with site_id
 
     Returns:
-        Detection result
+        Detection result, including any repair outcome
     """
+    logger.info(f"POST /api/sites/detect - Triggering detection for site {req.site_id}")
+
+    site = db.query(Site).filter(Site.id == req.site_id).first()
+    if site is None:
+        raise HTTPException(status_code=404, detail=f"Site {req.site_id} not found")
+
+    selector = next((s for s in site.selectors if s.is_current), None)
+
     try:
-        logger.info(f"POST /api/sites/detect - Triggering detection for site {req.site_id}")
-        return {
-            "detected": False,
-            "confidence": 0.0,
-            "change_type": "none",
-            "details": None,
+        if not site.snapshot_pages:
+            logger.info(f"No baseline snapshot for site {site.id}, creating one")
+            snapshot = create_snapshot(site.url)
+            site.snapshot_hashes = snapshot["script_hashes"]
+            site.snapshot_pages = snapshot["pages"]
+            db.commit()
+
+            return {
+                "site_id": site.id,
+                "detected_at": utc_now().isoformat(),
+                "signal_type": "no_baseline",
+                "confidence": 0.0,
+                "detected": False,
+                "metadata": {"repaired": []},
+            }
+
+        old_snapshot = {
+            "script_hashes": site.snapshot_hashes or {},
+            "pages": site.snapshot_pages or {},
         }
+        result = detect_changes(site.url, old_snapshot)
+
+        db.add(
+            DetectionEvent(
+                site_id=site.id,
+                selector_id=selector.id if selector else None,
+                signal_type=result.change_type,
+                confidence=round(result.confidence * 100),
+            )
+        )
+
+        repaired: list[dict] = []
+        changes: list[dict] = []
+
+        if result.detected:
+            new_html = fetch_page(site.url)
+            old_html = old_snapshot["pages"].get(site.url)
+
+            if new_html and old_html:
+                # Auto-discover which element(s) changed, independent of
+                # whether a selector was ever configured for this site.
+                changes = diff_selectors(old_html, new_html)
+
+                if selector is not None:
+                    repair_result = repair_selector(
+                        site_url=site.url,
+                        old_selector=selector.selector_key,
+                        old_html=old_html,
+                        new_html=new_html,
+                    )
+
+                    db.add(
+                        RepairOutcome(
+                            selector_id=selector.id,
+                            old_selector=selector.selector_key,
+                            new_selector=repair_result.new_selector or "",
+                            repair_method=repair_result.method,
+                            status="success" if repair_result.success else "failed",
+                            confidence=round(repair_result.confidence * 100),
+                        )
+                    )
+
+                    if repair_result.success and repair_result.new_selector:
+                        selector.selector_key = repair_result.new_selector
+                        selector.repair_count += 1
+                        selector.last_repaired_at = utc_now()
+                        selector.repair_status = "success"
+                    else:
+                        selector.repair_status = "failed"
+
+                    repaired.append(
+                        {
+                            "selectorId": selector.id,
+                            "oldSelector": repair_result.old_selector,
+                            "newSelector": repair_result.new_selector,
+                            "method": repair_result.method,
+                            "confidence": repair_result.confidence,
+                            "success": repair_result.success,
+                        }
+                    )
+
+            # Refresh the baseline so the next check compares against
+            # the post-repair state, not the now-stale one.
+            snapshot = create_snapshot(site.url)
+            site.snapshot_hashes = snapshot["script_hashes"]
+            site.snapshot_pages = snapshot["pages"]
+
+        db.commit()
+
+        return {
+            "site_id": site.id,
+            "detected_at": utc_now().isoformat(),
+            "signal_type": result.change_type,
+            "confidence": result.confidence,
+            "detected": result.detected,
+            "metadata": {"repaired": repaired, "changes": changes},
+        }
+    except HTTPException:
+        raise
     except Exception as e:
+        db.rollback()
         logger.error(f"Failed to detect changes for site {req.site_id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -377,13 +573,14 @@ async def get_current_selector(selector_id: str = Path(...)):
 if __name__ == "__main__":
     import uvicorn
 
-    logger.info("Starting DriftLock Backend API on http://0.0.0.0:8000")
-    logger.info("Documentation available at http://localhost:8000/docs")
+    port = int(os.environ.get("PORT", 8000))
+    logger.info(f"Starting DriftLock Backend API on http://0.0.0.0:{port}")
+    logger.info(f"Documentation available at http://localhost:{port}/docs")
 
     uvicorn.run(
         "backend.api:app",
         host="0.0.0.0",
-        port=8000,
+        port=port,
         reload=False,
         log_level="info",
     )
