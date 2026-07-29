@@ -70,7 +70,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 export function onAuthStateChange(
   callback: (user: AuthUser | null) => void
 ): () => void {
-  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
     if (!session?.user) {
       callback(null);
       return;
@@ -111,8 +111,8 @@ export interface ChangeLog {
   id: number;
   selector_id: string;
   version_id?: number;
-  old_selector?: string;
-  new_selector: string;
+  old_selector?: string | null;
+  new_selector?: string | null;
   detection_method?: string;
   repair_method?: string;
   detection_timestamp: string;
@@ -252,7 +252,7 @@ export async function createChangeLog(log: Omit<ChangeLog, 'id'>): Promise<Chang
 
 export async function saveSnapshot(
   siteUrl: string,
-  snapshotData: Record<string, unknown>
+  snapshotData: { script_hashes: Record<string, string>; pages: Record<string, string> }
 ): Promise<boolean> {
   const { error } = await supabase.from('snapshots').insert([
     {
@@ -267,4 +267,29 @@ export async function saveSnapshot(
   }
 
   return true;
+}
+
+export interface Site {
+  id: string;
+  name: string;
+  url: string;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  owner_id: string;
+}
+
+export async function getSites(): Promise<Site[]> {
+  const { data, error } = await supabase
+    .from('sites')
+    .select('*')
+    .eq('is_active', true)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching sites:', error);
+    return [];
+  }
+
+  return data || [];
 }

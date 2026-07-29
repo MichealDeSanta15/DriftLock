@@ -18,8 +18,6 @@
  *   - Supabase client configured
  */
 
-import fetch from "node-fetch";
-
 const API_BASE = "http://localhost:3000";
 const TEST_SITE = "https://example.com";
 const TEST_SELECTOR_ID = `test_sel_${Date.now()}`;

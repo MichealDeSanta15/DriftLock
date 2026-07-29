@@ -31,7 +31,7 @@ interface CurrentSelectorResponse {
  * Handler for getting the current selector.
  */
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: { selectorId: string } }
 ): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
