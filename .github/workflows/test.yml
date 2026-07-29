@@ -1,10 +1,10 @@
 # GitHub Actions CI/CD for DriftLock Backend
 #
 # Automated testing on every push and pull request:
-# - Runs pytest with coverage
+# - Runs pytest with coverage against PostgreSQL 15
 # - Tests code quality (flake8, mypy, black)
 # - Verifies database migrations
-# - Uses PostgreSQL service container
+# - Proper Python path and working directories
 #
 # Tests must pass before merging to main
 
@@ -28,6 +28,7 @@ jobs:
   test:
     name: Test Backend (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    working-directory: ./
 
     strategy:
       matrix:
@@ -35,10 +36,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:15
         env:
-          POSTGRES_USER: driftlock
-          POSTGRES_PASSWORD: test_password
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: driftlock_test
         options: >-
           --health-cmd pg_isready
@@ -47,6 +47,10 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/driftlock_test
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout code
@@ -61,40 +65,59 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r backend/requirements.txt
+
+      - name: Verify Python path
+        run: |
+          echo "Current directory: $(pwd)"
+          echo "Python path: $PYTHONPATH"
+          echo "Backend module location:"
+          ls -la backend/
+          python -c "import sys; print('Python path:', sys.path)"
 
       - name: Wait for PostgreSQL
         run: |
-          until pg_isready -h localhost -U driftlock -d driftlock_test; do
+          until pg_isready -h localhost -U postgres -d driftlock_test; do
             echo "Waiting for PostgreSQL..."
             sleep 1
           done
         env:
-          PGPASSWORD: test_password
+          PGPASSWORD: postgres
 
       - name: Run database migrations
-        env:
-          DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
-        working-directory: backend
         run: |
+          echo "Running migrations..."
+          cd backend
           alembic upgrade head
+          echo "✓ Migrations completed"
+
+      - name: Verify migrations
+        run: |
+          cd backend
+          echo "Migration status:"
+          alembic current
+          echo ""
+          echo "Migration history:"
+          alembic history --verbose
 
       - name: Run integration tests
-        env:
-          DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
         run: |
-          pytest backend/tests/integration_test.py -v --tb=short --cov=backend --cov-report=xml --cov-report=term-missing
+          echo "Running integration tests..."
+          cd backend
+          pytest tests/integration_test.py -v --tb=short --cov=. --cov-report=xml --cov-report=term-missing
+          echo "✓ Integration tests completed"
 
       - name: Run all tests
-        env:
-          DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
         run: |
-          pytest backend/tests/ -v --tb=short --cov=backend --cov-report=xml --cov-report=term-missing
+          echo "Running all tests..."
+          cd backend
+          pytest tests/ -v --tb=short --cov=. --cov-report=xml --cov-report=term-missing
+          echo "✓ All tests completed"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
-          files: ./coverage.xml
+          files: ./backend/coverage.xml
           flags: unittests
           name: codecov-umbrella
           fail_ci_if_error: false
@@ -103,6 +126,9 @@ jobs:
   lint:
     name: Lint Backend Code
     runs-on: ubuntu-latest
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout code
@@ -117,7 +143,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r backend/requirements.txt
 
       - name: Run flake8
         run: |
@@ -141,10 +167,9 @@ jobs:
 
     services:
       postgres:
-        image: postgres:15-alpine
+        image: postgres:15
         env:
-          POSTGRES_USER: driftlock
-          POSTGRES_PASSWORD: test_password
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: driftlock_test
         options: >-
           --health-cmd pg_isready
@@ -153,6 +178,10 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/driftlock_test
+      PYTHONPATH: ${{ github.workspace }}
 
     steps:
       - name: Checkout code
@@ -167,33 +196,29 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r backend/requirements.txt
 
-      - name: Wait for PostgreSQL (migrations)
+      - name: Wait for PostgreSQL
         run: |
-          until pg_isready -h localhost -U driftlock -d driftlock_test; do
+          until pg_isready -h localhost -U postgres -d driftlock_test; do
             echo "Waiting for PostgreSQL..."
             sleep 1
           done
         env:
-          PGPASSWORD: test_password
+          PGPASSWORD: postgres
 
       - name: Run migrations
-        env:
-          DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
-        working-directory: backend
         run: |
           echo "Applying migrations..."
+          cd backend
           alembic upgrade head
           echo "✓ Migrations applied successfully"
 
       - name: Verify migrations
-        env:
-          DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
-        working-directory: backend
         run: |
+          cd backend
           echo "Current migration version:"
           alembic current
           echo ""
           echo "Migration history:"
-          alembic history
+          alembic history --verbose
