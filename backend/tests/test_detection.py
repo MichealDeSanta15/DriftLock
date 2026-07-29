@@ -8,7 +8,7 @@ Tests detection on realistic HTML from 2 sites:
 import pytest
 import responses
 
-from backend.detection.site_monitor import (
+from ..detection.site_monitor import (
     extract_script_hashes,
     compare_script_hashes,
     calculate_dom_diff,

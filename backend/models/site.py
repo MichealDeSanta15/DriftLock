@@ -3,10 +3,10 @@
 from datetime import datetime, timezone
 from typing import List
 
-from sqlalchemy import Column, String, DateTime, Boolean, Index
+from sqlalchemy import Column, String, DateTime, Boolean, Index, JSON
 from sqlalchemy.orm import relationship
 
-from backend.models.base import Base, generate_uuid
+from .base import Base, generate_uuid
 
 
 class Site(Base):
@@ -34,6 +34,11 @@ class Site(Base):
         nullable=False,
     )
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Baseline snapshot for change detection: script hashes and last-seen
+    # page HTML, keyed by page URL. Populated on first detect() call.
+    snapshot_hashes = Column(JSON, nullable=True)
+    snapshot_pages = Column(JSON, nullable=True)
 
     selectors = relationship(
         "Selector",

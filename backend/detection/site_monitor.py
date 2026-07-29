@@ -269,3 +269,78 @@ def create_snapshot(site_url: str, page_urls: Optional[list[str]] = None) -> dic
             snapshot["pages"][page_url] = html
 
     return snapshot
+
+
+_IGNORED_TAGS = {"script", "style", "meta", "link", "noscript", "html", "head", "body"}
+
+
+def _selector_for(element) -> Optional[str]:
+    """Build a simple CSS selector (tag.class or tag#id) for an element."""
+    if element.name is None:
+        return None
+    if element.get("class"):
+        return f"{element.name}.{'.'.join(element['class'])}"
+    if element.get("id"):
+        return f"{element.name}#{element['id']}"
+    return None
+
+
+def _text_to_selector_map(html: str) -> dict[str, str]:
+    """Map each leaf element's visible text to its CSS selector.
+
+    Only considers elements that have a class or id (so a selector can
+    actually be built) and no element children (so a change is attributed
+    to the specific element whose attributes moved, not every ancestor
+    that happens to contain the same text).
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    mapping: dict[str, str] = {}
+
+    for element in soup.find_all(True):
+        if element.name in _IGNORED_TAGS or element.find(True) is not None:
+            continue
+
+        text = element.get_text(strip=True)
+        if not text or len(text) > 200:
+            continue
+
+        selector = _selector_for(element)
+        if selector and text not in mapping:
+            mapping[text] = selector
+
+    return mapping
+
+
+def diff_selectors(old_html: str, new_html: str) -> list[dict]:
+    """Find elements whose selector (class/id) changed between two snapshots.
+
+    Matches elements by their visible text: if the same text now lives under
+    a different class or id, that's reported as a selector rename (e.g. a
+    site redesign changing `h1.product-title` to `h1.product-name`). This
+    works without any selector being pre-configured for the site.
+
+    Args:
+        old_html: Previous version of the page.
+        new_html: Current version of the page.
+
+    Returns:
+        List of {text, old_selector, new_selector} dicts, one per changed
+        element. Elements whose text disappeared entirely (not just moved)
+        are not included, since there's nothing to point the new selector at.
+    """
+    old_map = _text_to_selector_map(old_html)
+    new_map = _text_to_selector_map(new_html)
+
+    changes = []
+    for text, old_selector in old_map.items():
+        new_selector = new_map.get(text)
+        if new_selector and new_selector != old_selector:
+            changes.append(
+                {
+                    "text": text[:80],
+                    "old_selector": old_selector,
+                    "new_selector": new_selector,
+                }
+            )
+
+    return changes

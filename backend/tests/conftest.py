@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
-from backend.models.base import Base
+from ..models.base import Base
 
 # Get test database URL from environment or use default
 # For integration tests: use PostgreSQL

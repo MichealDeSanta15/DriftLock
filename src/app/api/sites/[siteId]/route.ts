@@ -10,12 +10,30 @@ export async function PUT(
   const log = createRequestLogger(requestId);
   const siteId = params.siteId;
 
+  const { name, url } = await req.json();
+
   try {
-    const { name, url } = await req.json();
     log.info({ siteId, name, url }, 'Updating site');
 
     if (!name || !url) {
       return NextResponse.json({ error: 'Name and URL are required' }, { status: 400 });
+    }
+
+    const backendUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
+    try {
+      const backendResponse = await fetch(`${backendUrl}/api/sites/${siteId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, url }),
+      });
+
+      if (backendResponse.ok) {
+        const updatedSite = await backendResponse.json();
+        log.info({ siteId }, 'Site updated via Python backend');
+        return NextResponse.json(updatedSite, { status: 200 });
+      }
+    } catch (backendError) {
+      log.warn('Failed to update via Python backend, trying Supabase');
     }
 
     const { error } = await supabase
@@ -52,6 +70,20 @@ export async function DELETE(
 
   try {
     log.info({ siteId }, 'Deleting site');
+
+    const backendUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
+    try {
+      const backendResponse = await fetch(`${backendUrl}/api/sites/${siteId}`, {
+        method: 'DELETE',
+      });
+
+      if (backendResponse.ok) {
+        log.info({ siteId }, 'Site deleted via Python backend');
+        return NextResponse.json({ success: true }, { status: 200 });
+      }
+    } catch (backendError) {
+      log.warn('Failed to delete via Python backend, trying Supabase');
+    }
 
     const { error } = await supabase.from('sites').delete().eq('id', siteId);
 

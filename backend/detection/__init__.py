@@ -6,7 +6,7 @@ Detects redesigns using:
 - Multi-page template shift detection
 """
 
-from backend.detection.site_monitor import (
+from .site_monitor import (
     DetectionResult,
     detect_changes,
     create_snapshot,
@@ -14,6 +14,7 @@ from backend.detection.site_monitor import (
     compare_script_hashes,
     calculate_dom_diff,
     detect_template_shift,
+    diff_selectors,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "compare_script_hashes",
     "calculate_dom_diff",
     "detect_template_shift",
+    "diff_selectors",
 ]

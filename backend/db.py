@@ -38,6 +38,6 @@ def init_db() -> None:
 
     Run this once at startup or use Alembic migrations in production.
     """
-    from backend.models.base import Base
+    from .models.base import Base
 
     Base.metadata.create_all(bind=engine)
