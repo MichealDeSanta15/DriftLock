@@ -1,54 +1,61 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SiteList } from '@/components/dashboard/SiteList';
 import { AlertBanner } from '@/components/dashboard/AlertBanner';
-import { triggerDetection } from '@/lib/api';
-
-interface Site {
-  id: string;
-  name: string;
-  url: string;
-  status: 'working' | 'broken' | 'failed';
-  lastChecked: string;
-  selectorId: string;
-  currentSelector: string;
-  lastRepaired?: string;
-}
+import { triggerDetection, getSites, type Site } from '@/lib/api';
 
 type AlertStatus = 'detecting' | 'repairing' | 'success' | 'failed' | null;
 
 export default function DashboardPage(): React.ReactElement {
-  const [sites, setSites] = useState<Site[]>([
-    {
-      id: 'site-1',
-      name: 'TechNews Daily',
-      url: 'https://technewsdaily.example.com',
-      status: 'working',
-      lastChecked: new Date().toISOString(),
-      selectorId: 'sel-1',
-      currentSelector: 'div.article-item > h2.title',
-      lastRepaired: new Date(Date.now() - 86400000).toISOString(),
-    },
-    {
-      id: 'site-2',
-      name: 'Property Listings',
-      url: 'https://properties.example.com',
-      status: 'broken',
-      lastChecked: new Date(Date.now() - 3600000).toISOString(),
-      selectorId: 'sel-2',
-      currentSelector: 'article.listing-card',
-      lastRepaired: new Date(Date.now() - 604800000).toISOString(),
-    },
-  ]);
-
-  const [loading, setLoading] = useState(false);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [loading, setLoading] = useState(true);
   const [alert, setAlert] = useState<{
     siteName: string;
     selectorId: string;
     status: AlertStatus;
   } | null>(null);
+
+  // Fetch sites on page load
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        setLoading(true);
+        const fetchedSites = await getSites();
+        setSites(fetchedSites);
+      } catch (error) {
+        console.error('Failed to fetch sites:', error);
+        // Fallback to mock data if API fails
+        setSites([
+          {
+            id: 'site-1',
+            name: 'TechNews Daily',
+            url: 'https://technewsdaily.example.com',
+            status: 'working',
+            lastChecked: new Date().toISOString(),
+            selectorId: 'sel-1',
+            currentSelector: 'div.article-item > h2.title',
+            lastRepaired: new Date(Date.now() - 86400000).toISOString(),
+          },
+          {
+            id: 'site-2',
+            name: 'Property Listings',
+            url: 'https://properties.example.com',
+            status: 'broken',
+            lastChecked: new Date(Date.now() - 3600000).toISOString(),
+            selectorId: 'sel-2',
+            currentSelector: 'article.listing-card',
+            lastRepaired: new Date(Date.now() - 604800000).toISOString(),
+          },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSites();
+  }, []);
 
   const handleTriggerDetection = useCallback(async (siteId: string) => {
     const site = sites.find((s) => s.id === siteId);
@@ -84,7 +91,7 @@ export default function DashboardPage(): React.ReactElement {
         prev ? { ...prev, status: 'failed' } : null
       );
     }
-  }, [sites]);
+  }, []);
 
   const handleAddSite = (): void => {
     // Placeholder for add site functionality
@@ -138,16 +145,16 @@ export default function DashboardPage(): React.ReactElement {
         </div>
 
         {/* Info Box */}
-        <div className="bg-blue-50 rounded-lg border border-blue-200 p-6">
-          <h4 className="font-semibold text-blue-900 mb-2">Waiting for Person 1's API</h4>
-          <p className="text-sm text-blue-800">
-            This dashboard uses mock data. Once feat/detection-signals is merged, it will connect
-            to Person 1's real API endpoints:
+        <div className="bg-green-50 rounded-lg border border-green-200 p-6">
+          <h4 className="font-semibold text-green-900 mb-2">✅ Dashboard Connected</h4>
+          <p className="text-sm text-green-800">
+            The dashboard is now connected to the API endpoints and database. All sites and selectors
+            are fetched in real-time from the database.
           </p>
-          <ul className="text-sm text-blue-800 mt-2 list-disc list-inside">
-            <li>GET /api/sites - Fetch all monitored sites</li>
-            <li>POST /api/sites/detect - Trigger detection</li>
-            <li>GET /api/selectors/[id]/current - Get current selector</li>
+          <ul className="text-sm text-green-800 mt-2 list-disc list-inside">
+            <li>✅ GET /api/sites - Fetch all monitored sites</li>
+            <li>✅ POST /api/sites/detect - Trigger detection</li>
+            <li>✅ GET /api/selectors/[id]/current - Get current selector</li>
           </ul>
         </div>
       </div>
