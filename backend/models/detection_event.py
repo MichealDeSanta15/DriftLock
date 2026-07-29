@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Index
+from sqlalchemy.orm import relationship
 
 from backend.models.base import Base, generate_uuid
 
