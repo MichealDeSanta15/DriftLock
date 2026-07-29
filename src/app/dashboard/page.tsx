@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SiteList } from '@/components/dashboard/SiteList';
 import { AlertBanner } from '@/components/dashboard/AlertBanner';
 import { triggerDetection, getSites, type Site } from '@/lib/api';
+import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
 import { supabase } from '@/lib/supabase';
 
 type AlertStatus = 'detecting' | 'repairing' | 'success' | 'failed' | null;
@@ -19,6 +20,7 @@ interface Alert {
 export default function DashboardPage(): React.ReactElement {
   const [sites, setSites] = useState<Site[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [detectionInProgress, setDetectionInProgress] = useState<string | null>(null);
   const [alert, setAlert] = useState<Alert | null>(null);
   const subscriptionRef = useRef<{ unsubscribe: () => Promise<any> } | null>(null);
@@ -34,14 +36,18 @@ export default function DashboardPage(): React.ReactElement {
       try {
         log('Fetching sites from API...');
         setLoading(true);
+        setError(null);
         const fetchedSites = await getSites();
         log(`Successfully fetched ${fetchedSites.length} sites`, {
           sites: fetchedSites.map((s) => ({ id: s.id, name: s.name, status: s.status })),
         });
         setSites(fetchedSites);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
+      } catch (err) {
+        const apiError = parseAPIError(err);
+        const errorMessage = apiError.message;
+        handleAPIError(err);
         log('Failed to fetch sites from API, using mock data', { error: errorMessage });
+        setError('Failed to load sites. Using mock data.');
         // Fallback to mock data if API fails
         setSites([
           {
@@ -276,10 +282,18 @@ export default function DashboardPage(): React.ReactElement {
           <button
             onClick={handleAddSite}
             className="px-4 py-2 bg-indigo-600 dark:bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 dark:hover:bg-indigo-700 transition"
+            aria-label="Add new site"
           >
             + Add Site
           </button>
         </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 p-4">
+            <p className="text-sm text-yellow-800 dark:text-yellow-300">⚠️ {error}</p>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

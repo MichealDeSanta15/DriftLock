@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { type Site } from '@/lib/api';
+import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
 
 interface AddSiteModalProps {
   onSuccess: (site: Site) => void;
@@ -56,7 +57,9 @@ export function AddSiteModal({ onSuccess, onCancel }: AddSiteModalProps): React.
       const newSite = await response.json();
       onSuccess(newSite);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create site');
+      const apiError = parseAPIError(err);
+      handleAPIError(err);
+      setError(apiError.message);
     } finally {
       setLoading(false);
     }

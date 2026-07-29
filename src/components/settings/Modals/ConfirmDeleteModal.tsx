@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
 
 interface ConfirmDeleteModalProps {
   siteName: string;
@@ -35,7 +36,9 @@ export function ConfirmDeleteModal({
 
       onConfirm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete site');
+      const apiError = parseAPIError(err);
+      handleAPIError(err);
+      setError(apiError.message);
     } finally {
       setLoading(false);
     }

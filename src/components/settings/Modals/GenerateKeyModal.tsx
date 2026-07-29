@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { parseAPIError, handleAPIError } from '@/lib/errorHandler';
 
 interface GenerateKeyModalProps {
   onSuccess: () => void;
@@ -44,7 +45,9 @@ export function GenerateKeyModal({ onSuccess, onCancel }: GenerateKeyModalProps)
       const data = await response.json();
       setGeneratedKey(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to generate key');
+      const apiError = parseAPIError(err);
+      handleAPIError(err);
+      setError(apiError.message);
     } finally {
       setLoading(false);
     }
