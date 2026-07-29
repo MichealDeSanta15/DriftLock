@@ -1,0 +1,61 @@
+version: "3.9"
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: driftlock-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-driftlock}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-driftlock_dev_password}
+      POSTGRES_DB: ${DB_NAME:-driftlock}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-driftlock}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - driftlock-network
+
+  # Python Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: driftlock-backend
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-driftlock}:${DB_PASSWORD:-driftlock_dev_password}@postgres:5432/${DB_NAME:-driftlock}
+      PYTHONUNBUFFERED: "1"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      SQL_ECHO: ${SQL_ECHO:-false}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live reload for development
+      - ./backend:/app/backend
+      - ./pyproject.toml:/app/pyproject.toml
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - driftlock-network
+    command: >
+      sh -c "python -m alembic upgrade head &&
+             python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000 --reload"
+
+networks:
+  driftlock-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
