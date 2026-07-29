@@ -71,7 +71,7 @@ class TestDatabaseConnection:
         }
 
         for table, expected_cols in expected_columns.items():
-            columns = {col.name for col in inspector.get_columns(table)}
+            columns = {col["name"] for col in inspector.get_columns(table)}
             for col in expected_cols:
                 assert col in columns, f"Column '{col}' not found in table '{table}'"
 
@@ -89,7 +89,7 @@ class TestDatabaseConnection:
         }
 
         for table, indexes in expected_indexes.items():
-            existing_indexes = {idx.name for idx in inspector.get_indexes(table)}
+            existing_indexes = {idx["name"] for idx in inspector.get_indexes(table)}
             for idx in indexes:
                 assert idx in existing_indexes, f"Index '{idx}' not found on table '{table}'"
 

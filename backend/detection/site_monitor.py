@@ -69,6 +69,8 @@ def compare_script_hashes(old_hashes: dict[str, str], new_hashes: dict[str, str]
 
     total_scripts = len(old_set)
     if total_scripts == 0:
+        if new_set:
+            return True, 1.0
         return False, 0.0
 
     change_ratio = (len(added) + len(removed) + changed) / total_scripts
