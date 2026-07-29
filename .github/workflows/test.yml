@@ -1,3 +1,13 @@
+# GitHub Actions CI/CD for DriftLock Backend
+#
+# Automated testing on every push and pull request:
+# - Runs pytest with coverage
+# - Tests code quality (flake8, mypy, black)
+# - Verifies database migrations
+# - Uses PostgreSQL service container
+#
+# Tests must pass before merging to main
+
 name: Test Backend
 
 on:
@@ -53,11 +63,33 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run pytest
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -U driftlock -d driftlock_test; do
+            echo "Waiting for PostgreSQL..."
+            sleep 1
+          done
+        env:
+          PGPASSWORD: test_password
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
+        working-directory: backend
+        run: |
+          alembic upgrade head
+
+      - name: Run integration tests
         env:
           DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
         run: |
-          pytest backend/tests/ -v --cov=backend --cov-report=xml --cov-report=term-missing
+          pytest backend/tests/integration_test.py -v --tb=short --cov=backend --cov-report=xml --cov-report=term-missing
+
+      - name: Run all tests
+        env:
+          DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
+        run: |
+          pytest backend/tests/ -v --tb=short --cov=backend --cov-report=xml --cov-report=term-missing
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
@@ -137,17 +169,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Wait for PostgreSQL (migrations)
+        run: |
+          until pg_isready -h localhost -U driftlock -d driftlock_test; do
+            echo "Waiting for PostgreSQL..."
+            sleep 1
+          done
+        env:
+          PGPASSWORD: test_password
+
       - name: Run migrations
         env:
           DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
         working-directory: backend
         run: |
+          echo "Applying migrations..."
           alembic upgrade head
+          echo "✓ Migrations applied successfully"
 
       - name: Verify migrations
         env:
           DATABASE_URL: postgresql://driftlock:test_password@localhost:5432/driftlock_test
         working-directory: backend
         run: |
+          echo "Current migration version:"
           alembic current
+          echo ""
+          echo "Migration history:"
           alembic history
