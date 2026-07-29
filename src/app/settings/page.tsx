@@ -5,16 +5,17 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { SiteManagement } from '@/components/settings/SiteManagement';
 import { APIKeysSection } from '@/components/settings/APIKeysSection';
 import { BillingSection } from '@/components/settings/BillingSection';
+import { Globe, Key, CreditCard } from 'lucide-react';
 
 type SettingsTab = 'sites' | 'api-keys' | 'billing';
 
 export default function SettingsPage(): React.ReactElement {
   const [activeTab, setActiveTab] = useState<SettingsTab>('sites');
 
-  const tabs: { id: SettingsTab; label: string; icon: string }[] = [
-    { id: 'sites', label: 'Site Management', icon: '🌐' },
-    { id: 'api-keys', label: 'API Keys', icon: '🔑' },
-    { id: 'billing', label: 'Billing', icon: '💳' },
+  const tabs: { id: SettingsTab; label: string; icon: React.ReactNode }[] = [
+    { id: 'sites', label: 'Site Management', icon: <Globe size={20} /> },
+    { id: 'api-keys', label: 'API Keys', icon: <Key size={20} /> },
+    { id: 'billing', label: 'Billing', icon: <CreditCard size={20} /> },
   ];
 
   return (
@@ -22,11 +23,11 @@ export default function SettingsPage(): React.ReactElement {
       <div className="space-y-8">
         {/* Header */}
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Settings</h2>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">Manage your sites, API keys, and billing</p>
+          <h1 className="text-4xl font-bold text-white">Settings</h1>
+          <p className="text-slate-400 mt-2">Manage your sites, API keys, and billing preferences</p>
         </div>
 
-        {/* Tabs */}
+        {/* Tabs Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar Navigation */}
           <div className="lg:col-span-1">
@@ -35,13 +36,14 @@ export default function SettingsPage(): React.ReactElement {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`whitespace-nowrap lg:w-full px-4 py-3 text-left font-medium rounded-lg transition ${
+                  className={`flex items-center gap-3 whitespace-nowrap lg:w-full px-4 py-3 rounded-lg font-medium transition-all duration-300 ${
                     activeTab === tab.id
-                      ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400'
-                      : 'text-gray-700 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
+                      : 'text-slate-400 hover:text-slate-300 hover:bg-slate-800/50'
                   }`}
                 >
-                  <span>{tab.icon} {tab.label}</span>
+                  {tab.icon}
+                  <span>{tab.label}</span>
                 </button>
               ))}
             </nav>
@@ -49,9 +51,11 @@ export default function SettingsPage(): React.ReactElement {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            {activeTab === 'sites' && <SiteManagement />}
-            {activeTab === 'api-keys' && <APIKeysSection />}
-            {activeTab === 'billing' && <BillingSection />}
+            <div className="space-y-6">
+              {activeTab === 'sites' && <SiteManagement />}
+              {activeTab === 'api-keys' && <APIKeysSection />}
+              {activeTab === 'billing' && <BillingSection />}
+            </div>
           </div>
         </div>
       </div>
