@@ -1,64 +1,86 @@
 'use client';
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState } from 'react';
 import Link from 'next/link';
+import { LayoutDashboard, Globe, Settings, LogOut, Menu, X, Key } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps): React.ReactElement {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="flex h-screen bg-slate-950">
       {/* Sidebar */}
-      <aside className="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">DriftLock</h1>
-        </div>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 border-r border-slate-800 transform transition-transform duration-300 ease-in-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0`}>
+        <div className="flex flex-col h-full">
+          {/* Logo */}
+          <div className="p-6 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold">D</span>
+              </div>
+              <h1 className="text-xl font-bold text-white">DriftLock</h1>
+            </div>
+          </div>
 
-        <nav className="space-y-1 px-3">
-          <NavLink href="/dashboard" label="Dashboard" />
-          <NavLink href="/sites" label="Sites" />
-          <NavLink href="/selectors" label="Selectors" />
-          <NavLink href="/detections" label="Detections" />
-        </nav>
+          {/* Navigation */}
+          <nav className="flex-1 p-4 space-y-1">
+            <NavLink href="/dashboard" label="Dashboard" icon={LayoutDashboard} />
+            <NavLink href="/sites" label="Sites" icon={Globe} />
+            <NavLink href="/settings" label="Settings" icon={Settings} />
+            <NavLink href="/api" label="API Keys" icon={Key} />
+          </nav>
 
-        <div className="absolute bottom-6 left-6 right-6">
-          <button className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600">
-            Sign Out
-          </button>
+          {/* Sign Out */}
+          <div className="p-4 border-t border-slate-800">
+            <button className="w-full flex items-center gap-2 px-4 py-2.5 text-slate-300 hover:text-white rounded-lg hover:bg-slate-800/50 transition-colors duration-300">
+              <LogOut size={18} />
+              <span className="text-sm font-medium">Sign Out</span>
+            </button>
+          </div>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top navbar */}
-        <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <div className="px-8 py-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Welcome</h2>
+        <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
+          <div className="px-6 py-4 flex items-center justify-between">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="lg:hidden p-2 text-slate-400 hover:text-white transition-colors"
+            >
+              {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+            </button>
+
+            <h2 className="text-lg font-semibold text-white">Welcome back</h2>
+
             <div className="flex items-center space-x-4">
-              <button className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                  />
-                </svg>
+              <button className="p-2 text-slate-400 hover:text-white transition-colors hover:bg-slate-800 rounded-lg">
+                <Settings size={20} />
               </button>
             </div>
           </div>
         </header>
 
         {/* Page content */}
-        <div className="px-8 py-6">{children}</div>
+        <div className="flex-1 overflow-auto">
+          <div className="px-6 lg:px-8 py-6">
+            {children}
+          </div>
+        </div>
       </main>
+
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -66,15 +88,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps): React.React
 interface NavLinkProps {
   href: string;
   label: string;
+  icon: React.ComponentType<any>;
 }
 
-function NavLink({ href, label }: NavLinkProps): React.ReactElement {
+function NavLink({ href, label, icon: Icon }: NavLinkProps): React.ReactElement {
   return (
     <Link
       href={href}
-      className="block px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+      className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-300 rounded-lg hover:text-white hover:bg-slate-800/50 transition-colors duration-300"
     >
-      {label}
+      <Icon size={18} />
+      <span>{label}</span>
     </Link>
   );
 }

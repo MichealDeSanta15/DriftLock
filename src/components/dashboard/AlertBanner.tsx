@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { CheckCircle, AlertCircle, AlertTriangle, Loader, X } from 'lucide-react';
 
 interface AlertBannerProps {
   siteName: string;
@@ -29,7 +30,7 @@ export function AlertBanner({
     const timer = setTimeout(() => {
       setVisible(false);
       onDismiss?.();
-    }, 5000);
+    }, 4000);
 
     return () => clearTimeout(timer);
   }, [status, onDismiss, autoClose]);
@@ -38,57 +39,67 @@ export function AlertBanner({
 
   const statusConfig = {
     detecting: {
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20',
-      borderColor: 'border-blue-200 dark:border-blue-700',
-      textColor: 'text-blue-900 dark:text-blue-200',
-      icon: '🔍',
+      bgColor: 'bg-slate-900/80 border-slate-800',
+      textColor: 'text-slate-200',
+      accentColor: 'text-blue-400',
+      icon: Loader,
       title: 'Detecting changes...',
+      showSpinner: true,
     },
     repairing: {
-      bgColor: 'bg-amber-50 dark:bg-amber-900/20',
-      borderColor: 'border-amber-200 dark:border-amber-700',
-      textColor: 'text-amber-900 dark:text-amber-200',
-      icon: '⚙️',
+      bgColor: 'bg-slate-900/80 border-slate-800',
+      textColor: 'text-slate-200',
+      accentColor: 'text-amber-400',
+      icon: AlertTriangle,
       title: 'Repairing selectors...',
+      showSpinner: true,
     },
     success: {
-      bgColor: 'bg-green-50 dark:bg-green-900/20',
-      borderColor: 'border-green-200 dark:border-green-700',
-      textColor: 'text-green-900 dark:text-green-200',
-      icon: '✅',
+      bgColor: 'bg-slate-900/80 border-slate-800',
+      textColor: 'text-slate-200',
+      accentColor: 'text-green-400',
+      icon: CheckCircle,
       title: 'Repair successful!',
+      showSpinner: false,
     },
     failed: {
-      bgColor: 'bg-red-50 dark:bg-red-900/20',
-      borderColor: 'border-red-200 dark:border-red-700',
-      textColor: 'text-red-900 dark:text-red-200',
-      icon: '❌',
+      bgColor: 'bg-slate-900/80 border-slate-800',
+      textColor: 'text-slate-200',
+      accentColor: 'text-red-400',
+      icon: AlertCircle,
       title: 'Repair failed',
+      showSpinner: false,
     },
   };
 
   const config = statusConfig[status];
+  const IconComponent = config.icon;
 
   return (
     <div
-      className={`fixed top-6 right-6 max-w-md rounded-lg border ${config.bgColor} ${config.borderColor} p-4 shadow-lg z-50 animate-slideIn`}
+      className={`fixed top-6 right-6 max-w-md rounded-xl border backdrop-blur-sm ${config.bgColor} p-4 shadow-xl z-50 animate-slideIn`}
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3 flex-1">
-          <span className="text-xl flex-shrink-0">{config.icon}</span>
-          <div className="flex-1">
-            <p className={`font-semibold ${config.textColor}`}>{config.title}</p>
-            <p className={`text-sm mt-2 ${config.textColor} opacity-90`}>
+          <div className={`flex-shrink-0 mt-0.5 ${config.accentColor}`}>
+            {config.showSpinner ? (
+              <Loader size={20} className="animate-spin" />
+            ) : (
+              <IconComponent size={20} />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className={`font-semibold ${config.accentColor}`}>{config.title}</p>
+            <p className={`text-sm mt-1 ${config.textColor} opacity-80`}>
               {message || (
                 <>
-                  Site: <strong>{siteName}</strong>
+                  <span className="block">
+                    Site: <span className="font-medium text-white">{siteName}</span>
+                  </span>
                   {selectorId && (
-                    <>
-                      <br />
-                      Selector: <code className="text-xs bg-black/10 dark:bg-black/30 px-1 rounded">
-                        {selectorId}
-                      </code>
-                    </>
+                    <span className="block text-xs mt-1 font-mono text-slate-400">
+                      ID: {selectorId.substring(0, 20)}
+                    </span>
                   )}
                 </>
               )}
@@ -100,10 +111,10 @@ export function AlertBanner({
             setVisible(false);
             onDismiss?.();
           }}
-          className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400 flex-shrink-0 text-lg"
+          className="flex-shrink-0 text-slate-500 hover:text-slate-300 transition-colors"
           aria-label="Dismiss alert"
         >
-          ✕
+          <X size={18} />
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 
 export type SelectorHealthStatus = 'working' | 'broken' | 'failed';
 
@@ -21,54 +22,70 @@ export function SelectorStatus({
 }: SelectorStatusProps): React.ReactElement {
   const statusConfig = {
     working: {
-      bgColor: 'bg-green-100 dark:bg-green-900/30',
-      textColor: 'text-green-800 dark:text-green-300',
-      badgeColor: 'bg-green-600 dark:bg-green-600',
-      icon: '✅',
+      badgeBg: 'bg-green-500/20',
+      badgeText: 'text-green-400',
+      icon: CheckCircle,
       label: 'Working',
+      dotColor: 'bg-green-500',
+      animateDot: false,
     },
     broken: {
-      bgColor: 'bg-yellow-100 dark:bg-yellow-900/30',
-      textColor: 'text-yellow-800 dark:text-yellow-300',
-      badgeColor: 'bg-yellow-600 dark:bg-yellow-600',
-      icon: '⚠️',
+      badgeBg: 'bg-amber-500/20',
+      badgeText: 'text-amber-400',
+      icon: AlertTriangle,
       label: 'Broken',
+      dotColor: 'bg-amber-500',
+      animateDot: true,
     },
     failed: {
-      bgColor: 'bg-red-100 dark:bg-red-900/30',
-      textColor: 'text-red-800 dark:text-red-300',
-      badgeColor: 'bg-red-600 dark:bg-red-600',
-      icon: '❌',
-      label: 'Repair Failed',
+      badgeBg: 'bg-red-500/20',
+      badgeText: 'text-red-400',
+      icon: XCircle,
+      label: 'Failed',
+      dotColor: 'bg-red-500',
+      animateDot: false,
     },
   };
 
   const config = statusConfig[status];
+  const IconComponent = config.icon;
 
   if (compact) {
     return (
-      <div className="flex items-center gap-2">
-        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.bgColor} ${config.textColor}`}>
-          {config.icon} {config.label}
+      <div className="inline-flex items-center">
+        <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${config.badgeBg} ${config.badgeText}`}>
+          <div className={`w-1.5 h-1.5 rounded-full ${config.dotColor} ${config.animateDot ? 'animate-pulse' : ''}`} />
+          {config.label}
         </span>
       </div>
     );
   }
 
   return (
-    <div className={`rounded-lg p-4 ${config.bgColor}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className={`text-sm font-medium ${config.textColor}`}>
-            {config.icon} {config.label}
-          </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">ID: {selectorId}</p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 font-mono break-all">{currentSelector}</p>
-          {lastRepaired && (
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-              Last repaired: {new Date(lastRepaired).toLocaleString()}
+    <div className="card gradient-bg p-6">
+      <div className="flex items-start gap-4">
+        <div className={`flex-shrink-0 p-2 rounded-lg ${config.badgeBg}`}>
+          <IconComponent size={20} className={config.badgeText} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className={`font-semibold ${config.badgeText}`}>
+              {config.label}
             </p>
-          )}
+            {config.animateDot && (
+              <div className={`w-1.5 h-1.5 rounded-full ${config.dotColor} animate-pulse`} />
+            )}
+          </div>
+
+          <div className="mt-3 space-y-2 text-xs text-slate-400">
+            <p className="font-mono break-all bg-slate-800/50 p-2 rounded">
+              {currentSelector}
+            </p>
+            <p>ID: <span className="text-slate-300">{selectorId.substring(0, 16)}...</span></p>
+            {lastRepaired && (
+              <p>Last repaired: <span className="text-slate-300">{new Date(lastRepaired).toLocaleDateString()}</span></p>
+            )}
+          </div>
         </div>
       </div>
     </div>
