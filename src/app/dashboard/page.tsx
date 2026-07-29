@@ -255,11 +255,16 @@ export default function DashboardPage(): React.ReactElement {
               : s
           )
         );
+        const repairSummary =
+          changes.length > 0
+            ? `: ${changes.map((c) => `${c.old_selector} -> ${c.new_selector}`).join(', ')}`
+            : '';
+
         upsertAlert(site.selectorId, {
           siteName: site.name,
           selectorId: site.selectorId,
           status: 'success',
-          message: `Successfully repaired selectors for ${site.name}`,
+          message: `Successfully repaired selectors for ${site.name}${repairSummary}`,
         });
       } else {
         setSites((prevSites) =>
