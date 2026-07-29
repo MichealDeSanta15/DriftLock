@@ -8,6 +8,7 @@ interface AlertBannerProps {
   status: 'detecting' | 'repairing' | 'success' | 'failed';
   message?: string;
   onDismiss?: () => void;
+  autoClose?: boolean;
 }
 
 export function AlertBanner({
@@ -16,18 +17,19 @@ export function AlertBanner({
   status,
   message,
   onDismiss,
+  autoClose = true,
 }: AlertBannerProps): React.ReactElement | null {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    if (status === 'success' || status === 'failed') {
+    if (autoClose && (status === 'success' || status === 'failed')) {
       const timer = setTimeout(() => {
         setVisible(false);
         onDismiss?.();
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [status, onDismiss]);
+  }, [status, onDismiss, autoClose]);
 
   if (!visible) return null;
 
@@ -35,24 +37,28 @@ export function AlertBanner({
     detecting: {
       bgColor: 'bg-blue-50',
       borderColor: 'border-blue-200',
+      textColor: 'text-blue-900',
       icon: '🔍',
-      title: 'Detecting change...',
+      title: 'Detecting changes...',
     },
     repairing: {
       bgColor: 'bg-amber-50',
       borderColor: 'border-amber-200',
+      textColor: 'text-amber-900',
       icon: '⚙️',
-      title: 'Repairing selector...',
+      title: 'Repairing selectors...',
     },
     success: {
       bgColor: 'bg-green-50',
       borderColor: 'border-green-200',
+      textColor: 'text-green-900',
       icon: '✅',
       title: 'Repair successful!',
     },
     failed: {
       bgColor: 'bg-red-50',
       borderColor: 'border-red-200',
+      textColor: 'text-red-900',
       icon: '❌',
       title: 'Repair failed',
     },
@@ -62,15 +68,27 @@ export function AlertBanner({
 
   return (
     <div
-      className={`fixed top-6 right-6 max-w-md rounded-lg border ${config.bgColor} ${config.borderColor} p-4 shadow-lg z-50`}
+      className={`fixed top-6 right-6 max-w-md rounded-lg border ${config.bgColor} ${config.borderColor} p-4 shadow-lg z-50 animate-slideIn`}
     >
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
-          <span className="text-xl">{config.icon}</span>
-          <div>
-            <p className="font-medium text-gray-900">{config.title}</p>
-            <p className="text-sm text-gray-700 mt-1">
-              {message || `Selector for ${siteName} (ID: ${selectorId})`}
+        <div className="flex items-start gap-3 flex-1">
+          <span className="text-xl flex-shrink-0">{config.icon}</span>
+          <div className="flex-1">
+            <p className={`font-semibold ${config.textColor}`}>{config.title}</p>
+            <p className={`text-sm mt-2 ${config.textColor} opacity-90`}>
+              {message || (
+                <>
+                  Site: <strong>{siteName}</strong>
+                  {selectorId && (
+                    <>
+                      <br />
+                      Selector: <code className="text-xs bg-black bg-opacity-10 px-1 rounded">
+                        {selectorId}
+                      </code>
+                    </>
+                  )}
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -79,7 +97,8 @@ export function AlertBanner({
             setVisible(false);
             onDismiss?.();
           }}
-          className="text-gray-400 hover:text-gray-600"
+          className="text-gray-400 hover:text-gray-600 flex-shrink-0 text-lg"
+          aria-label="Dismiss alert"
         >
           ✕
         </button>

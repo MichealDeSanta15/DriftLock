@@ -17,6 +17,7 @@ interface Site {
 interface SiteListProps {
   sites: Site[];
   loading?: boolean;
+  detectionInProgress?: string | null;
   onRowClick?: (site: Site) => void;
   onTriggerDetection?: (siteId: string) => void;
 }
@@ -24,6 +25,7 @@ interface SiteListProps {
 export function SiteList({
   sites,
   loading = false,
+  detectionInProgress = null,
   onRowClick,
   onTriggerDetection,
 }: SiteListProps): React.ReactElement {
@@ -74,9 +76,17 @@ export function SiteList({
                         e.stopPropagation();
                         onTriggerDetection?.(site.id);
                       }}
-                      className="px-3 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition"
+                      disabled={detectionInProgress === site.id}
+                      className="px-3 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded hover:bg-indigo-100 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      Detect
+                      {detectionInProgress === site.id ? (
+                        <>
+                          <span className="inline-block w-3 h-3 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                          Detecting...
+                        </>
+                      ) : (
+                        'Detect'
+                      )}
                     </button>
                   </td>
                 </tr>
